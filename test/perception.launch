@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+
+	<arg name="name"/>
+
+	<!-- Haar Cascade resource for detect_faces_haar.py -->
+	<param name="haar_cascade" value="/hansonrobotics/release/scripts/haarcascade_frontalface_alt.xml"/>
+
+	<!-- temporary directory for face analysis -->
+	<param name="analysis_dir" value="/hansonrobotics/release/scripts"/>
+
+	<!-- sounds directory -->
+	<param name="sounds_dir" value="/hansonrobotics/release/scripts/sounds"/>
+
+	<!-- thumbnail directory -->
+	<param name="thumbs_dir" value="/hansonrobotics/release/scripts/thumbs"/>
+
+	<!-- geometry description -->
+	<param name="robot_description" textfile="$(env HOME)/hansonrobotics/release/scripts/robot.urdf"/>
+
+	<!-- whether or not to show camera feed debug windows -->
+	<param name="debug" value="true"/>
+
+	<!-- whether or not to store all thumbnails from the cameras -->
+	<param name="store_thumbs" value="false"/>
+
+	<!-- whether or not to store all sounds from the microphones -->
+	<param name="store_sounds" value="false"/>
+
+	<!-- whether or not to use RViz -->
+	<param name="visualization" value="true"/>
+
+	<!-- whether to visualize the pipeline candidates or the final result -->
+	<param name="visualize_pipeline" value="true"/>
+
+	<!-- whether or not to display thumbs in visualization -->
+	<param name="visualize_thumbs" value="false"/>
+
+	<!-- height of a standard face, in meters, as they are cut out by the face detection -->
+	<param name="face_height" value="0.155"/>
+
+	<!-- while we're still using Blender in the old backend, so update transformations accordingly -->
+	<!-- gather Blender PAU messages and generate joint_states, and update tf from that -->
+	<node name="gather_pau_states" type="gather_pau_states.py" pkg="r2_perception"/>
+	<node name="robot_state_publisher" type="state_publisher" pkg="robot_state_publisher"/>
+
+	<!-- /robot -->
+	<group ns="/$(arg name)">
+
+		<!-- perception subsystem -->
+		<group ns="perception">
+
+			<!-- left eye camera -->
+			<group ns="lefteye">
+				<param name="fovy" value="1.2"/>
+				<param name="aspect" value="1.33333"/>
+				<param name="rotate" value="-90"/>
+				<param name="camera_rate" value="10.0"/>
+				<param name="face_detect_rate" value="10.0"/>
+				<param name="hand_detect_rate" value="1.0"/>
+				<param name="saliency_detect_rate" value="5.0"/>
+				<param name="vision_rate" value="20.0"/>
+				<param name="face_regression" value="true"/>
+				<param name="hand_regression" value="true"/>
+				<param name="saliency_regression" value="false"/>
+				<node name="camera" type="usb_cam_node" pkg="usb_cam">
+					<param name="video_device" value="/dev/video1"/>
+					<param name="pixel_format" value="yuyv"/>
+					<param name="width" value="320"/>
+					<param name="height" value="240"/>
+				</node>
+				<node name="detect_faces" type="detect_faces_haar.py" pkg="r2_perception"/>
+				<node name="detect_hands" type="detect_hands.py" pkg="r2_perception"/>
+				<node name="detect_saliency" type="detect_saliency_ittikoch.py" pkg="r2_perception"/>
+				<node name="face_analysis" type="face_analysis_openbr.py" pkg="r2_perception"/>
+				<node name="vision_pipeline" type="vision_pipeline.py" pkg="r2_perception"/>
+			</group>
+
+			<!-- right eye camera -->
+			<!--<group ns="righteye">
+				<param name="fovy" value="1.2"/>
+				<param name="aspect" value="1.33333"/>
+				<param name="rotate" value="90"/>
+				<param name="camera_rate" value="10.0"/>
+				<param name="face_detect_rate" value="10.0"/>
+				<param name="hand_detect_rate" value="1.0"/>
+				<param name="saliency_detect_rate" value="5.0"/>
+				<param name="vision_rate" value="20.0"/>
+				<param name="face_regression" value="true"/>
+				<param name="hand_regression" value="true"/>
+				<param name="saliency_regression" value="false"/>
+				<node name="camera" type="usb_cam_node" pkg="usb_cam">
+					<param name="video_device" value="/dev/video2"/>
+					<param name="pixel_format" value="yuyv"/>
+					<param name="width" value="320"/>
+					<param name="height" value="240"/>
+				</node>
+				<node name="detect_faces" type="detect_faces_haar.py" pkg="r2_perception"/>
+				<node name="detect_hands" type="detect_hands.py" pkg="r2_perception"/>
+				<node name="detect_saliency" type="detect_saliency_ittikoch.py" pkg="r2_perception"/>
+				<node name="face_analysis" type="face_analysis.py" pkg="r2_perception"/>
+				<node name="vision_pipeline" type="vision_pipeline.py" pkg="r2_perception"/>
+			</group>-->
+
+			<!-- RealSense camera -->
+			<group ns="realsense">
+				<param name="fovy" value="1.0"/> <!-- not used for RealSense -->
+				<param name="aspect" value="1.33333"/>
+				<param name="camera_rate" value="10.0"/>
+				<param name="rotate" value="0"/>
+				<param name="face_detect_rate" value="10.0"/>
+				<param name="hand_detect_rate" value="1.0"/>
+				<param name="saliency_detect_rate" value="5.0"/>
+				<param name="vision_rate" value="20.0"/>
+				<param name="face_regression" value="true"/>
+				<param name="hand_regression" value="true"/>
+				<param name="saliency_regression" value="false"/>
+				<node name="realsense_param_proxy" type="realsense_param_proxy.py" pkg="r2_perception"/>
+				<node name="face_analysis" type="face_analysis_openbr.py" pkg="r2_perception"/>
+				<node name="vision_pipeline" type="vision_pipeline.py" pkg="r2_perception"/>
+			</group>
+
+			<!-- wideangle camera -->
+			<group ns="wideangle">
+				<param name="fovy" value="0.82"/>
+				<param name="aspect" value="1.33333"/>
+				<param name="camera_rate" value="10.0"/>
+				<param name="rotate" value="0"/>
+				<param name="face_detect_rate" value="10.0"/>
+				<param name="hand_detect_rate" value="1.0"/>
+				<param name="saliency_detect_rate" value="5.0"/>
+				<param name="vision_rate" value="20.0"/>
+				<param name="face_regression" value="true"/>
+				<param name="hand_regression" value="false"/>
+				<param name="saliency_regression" value="false"/>
+				<node name="camera" type="usb_cam_node" pkg="usb_cam">
+					<param name="video_device" value="/dev/video0"/>
+					<param name="pixel_format" value="yuyv"/>
+					<param name="width" value="640"/>
+					<param name="height" value="480"/>
+				</node>
+				<node name="detect_faces" type="detect_faces_haar.py" pkg="r2_perception"/>
+				<node name="detect_hands" type="detect_hands.py" pkg="r2_perception"/>
+				<node name="detect_saliency" type="detect_saliency_ittikoch.py" pkg="r2_perception"/>
+				<node name="face_analysis" type="face_analysis_openbr.py" pkg="r2_perception"/>
+				<node name="vision_pipeline" type="vision_pipeline.py" pkg="r2_perception"/>
+			</group>
+
+			<!-- Acoustic Magic microphone array -->
+			<group ns="acousticmagic">
+				<param name="device" value="hw:2,0"/>
+				<param name="threshold" value="0.3"/>
+				<param name="linger" value="0.2"/>
+				<param name="mic_rate" value="16000.0"/>
+				<param name="sound_detect_rate" value="10.0"/>
+				<param name="localization" value="true"/>
+				<param name="port" value="/dev/ttyUSB0"/>
+				<node name="detect_sound" type="detect_sound_hyst.py" pkg="r2_perception"/>
+				<!--<node name="speech_to_text_google" type="speech_to_text.py" pkg="r2_perception"/>-->
+				<node name="hearing_pipeline" type="hearing_pipeline.py" pkg="r2_perception"/>
+			</group>
+
+			<!-- handheld microphone -->
+			<group ns="handheld">
+				<param name="device" value="hw:1,0"/>
+				<param name="threshold" value="0.3"/>
+				<param name="linger" value="0.2"/>
+				<param name="mic_rate" value="16000.0"/>
+				<param name="sound_detect_rate" value="10.0"/>
+				<param name="localization" value="false"/>
+				<param name="port" value="/dev/ttyUSB0"/>
+				<node name="detect_sound" type="detect_sound_hyst.py" pkg="r2_perception"/>
+				<!--<node name="speech_to_text_google" type="speech_to_text.py" pkg="r2_perception"/>-->
+				<node name="hearing_pipeline" type="hearing_pipeline.py" pkg="r2_perception"/>
+			</group>
+
+			<!-- fusion node -->
+			<node name="fusion" type="fusion.py" pkg="r2_perception"/>
+
+			<!-- visualization of perception/input/sensor fusion -->
+			<node name="rviz" type="rviz" pkg="rviz" args="-d $(env HOME)/hansonrobotics/release/scripts/urdf.rviz"/>
+
+		</group>
+
+	</group>
+
+</launch>

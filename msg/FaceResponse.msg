@@ -1,0 +1,11 @@
+uint32 session_id
+uint32 camera_id
+uint32 cuser_id
+uint32 face_id
+time ts
+float32 age
+float32 age_confidence
+int32 gender
+float32 gender_confidence
+uint64 identity
+float32 identity_confidence

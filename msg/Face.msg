@@ -1,0 +1,10 @@
+uint32 face_id
+time ts
+Float32R rect
+Float32XYZ position
+float32 confidence
+float32 smile
+float32 frown
+string[] expressions
+Float32XY[] landmarks
+sensor_msgs/Image thumb

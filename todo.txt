@@ -1,0 +1,227 @@
+TODO: 
+
+* setup vision and hearing pipelines
+* refactor face detection
+* refactor hand detection from RealSense
+* build age estimation -> OpenBiometrics problem
+* build gender estimation -> OpenBiometrics problem
+* id, age and gender estimation cannot run asynchronously, so they have to be embedded in vision pipeline somehow
+* create directory structure and store all thumbs
+* hook up realsense faces
+* cut out realsense thumbs and send them over, depth is descoped for now
+* adjustable timer periods and FOVs and more parameters
+* refactor saliency for all cameras
+* hook up rviz (analyze current perception ROS node)
+* make transformations work from motor positions (refactor current perception ROS node)
+* refactor towards using dynamic reconfigure, instead of separate messages
+* disable/enable thumb storage
+* disable/enable sound storage
+* disable/enable debug windows
+* disable/enable rviz
+* make sure camera FOV works correctly
+* make face height global parameter
+* hook up RealSense hands
+* access ROS parameters in the RealSense code (with messages, dynamic reconfigure might still be too far off)
+* use locks to make sure, Python GIL might not do what we think it does
+* fix coordinate system issues between all components
+* briefly disable dynamic reconfigure because it is causing some bugs
+* pass hand gestures into fusion.py and rviz
+* make smoothing/extrapolation algorithm switchable
+* apply TF to all observations properly in fusion.py
+* rotate (random tilted webcam at home) eye camera image 90 or -90 degrees
+* use OpenBiometrics regardless of result, just so people can see it work
+* visualize candidate users in rviz
++ prepare demo environment to show that it works
++ prepare demo for/with Vytas, integration steps
++ turn saliency into unit vectors
++ fuse observations (cusers between pipelines, chands between pipelines, saliency points between pipelines, cusers+saliency points, hands+saliency points, sounds+cusers, sounds+hands, sounds+salient points, speech+cusers, speech+salient points)
++ output established users, hands, salient points and speech
++ documentation of everything
+- short-term solution for face identification? Mandeep? Ralf?
+
+There is no complete robot (with working eyes, neck, wideangle and realsense to test and tweak all details)
+
+Visualization TODO:
+
++ visualize candidate saliency unit vectors in rviz
+- visualize established users in rviz
+- visualize established saliency in rviz
+- visualize only resulting observations, or both with transparency
+
+
+Parametrize:
+
+- number of salient points to track
+- fuse distance between salient points
+- all continuity thresholds
+- algorithm choices
+- all minimum confidences
+- all pruning time differences
+- all max points
+- detect_faces: Haar cascade -> ROS parameter
+
+
+Back home:
+
++ output sounds and speech to directories and CSV
++ hook up speech and audio localization from both microphones
++ implement saliency for RealSense (needs video rescale and faster way to do the OpenCV algorithms)
++ make all nodes properly listen to dynamic reconfigure, see also Parametrize - why does dynamic reconfigure reset the parameters?
++ convert saliency to 3D by crossing beams in fusion.py (fuse saliency)
++ research how to use dynamic reconfigure in RealSense directly
+
+	try with logitech on left or right side of screen (i.e. update model)
+
+- audio detection and streaming, refactor audio_stream and audio_sensor
+
+	VAD (voice activity detection):
+
+		power thresholding
+
+		1991: BBC filtered out background noise in order to use power thresholding
+
+		G.729: extracts features from audio (spectral frequencies, full energy, low-band energy, zero crossing rate) and defines a region in that space that can be considered speech
+
+		GSM: threshold 9-band SNR
+
+		libvad
+
+		(currently, some form of SNR thresholding or spectral frequency analysis i.e. allow everything through that is between .. and .. Hz)
+
+- google speech, continuous and regular, refactor google_speech
+
+	find access patterns to google speech
+
+- dragon speech, continuous and regular, append to RealSense
+
+	1. Use RealSense for all mics, pass audio to linux (will require Windows to be there always)
+
+	2. Use RealSense for all mics, call google from Windows, pass audio and speech to linux (will require WIndows to be there always)
+
+	3. Get audio from Linux, pass to RealSense to process through Dragon, pass back to linux (most sensible, but probably slow)
+
+- definitive way to switch between microphone inputs for RealSense as well as Linux, taking into account the two-NUC setup, as well as running it all on one machine
+
+- refactor room luminance for all cameras (maybe add to saliency code)
+
+	add to saliency code as overall parameter
+
+- maintain CSV file(s) with parameters for stored faces (timestamp, anything already gathered from realsense, etc.)
+- verify confidences in all observations
+- put r2_perception on separate repository
+
+
+Descoped for now, coming back to later:
+
+- solve timing problem between Linux and Windows (first send ROS message to RealSense, wait for answer, the time difference divided by 2 is the general delay between Windows and Linux), this is not a problem right now, RealSense seems to be reasonably fast
+
+- detect_saliency: also output the actual feature it triggered on
+
+- research which of the nodes could potentially be C++ and/or combined
+
+- small node or C++ code that gets continuous feeds from all cameras, scales down the images and present them to all interested parties on the system
+
+- research how to combine depth and color images in RealSense, and output depth data to face thumbnails
+
+- clean up RealSense code only for this
+
+- research octomap...
+
+- fix dynamic parameters
+
+
+Towards OpenCog:
+
+	for each face:
+		position in 3D (robot coordinates)
+		confidence of this position (0..1)
+		how much she smiles (0..1) --> predicates (truthvalue)
+		how much she frowns (0..1)
+		various analyzed expressions (list of strings), TBD
+		gender, if found (None, Male, Female)
+		confidence in gender (0..1)
+		age, if found (None, 0..200)
+		confidence in age (0..1)
+		identity (64-bit ID, or string, could be more closely related to known atoms)
+		confidence in identity
+		... and whatever Ethiopia and Ralf come up with that might be interesting
+
+	for each hand:
+		position in 3D (robot coordinates)
+		confidence of this position (0..1)
+		various analyzed gestures (list of strings), TBD
+
+	for each salient point:
+		position in 3D (or only an angle.. not sure yet)
+		confidence (0..1; if two cameras see something interesting, it must be really interesting)
+
+	for each microphone:
+		translated speech
+		confidence of the translation (0..1)
+		localization of where the speech came from (angle, maybe quaternion)
+		confidence of the location
+
+
+Face: 28558a3a6ce84fb5228c6afc3566f32b
+Hand: 6253b9f7372c469c55267f148fc989c3
+Saliency: 1ff92493d75600a5ef3f9d5136bbd1f7
+RealSenseParam: 391bf7fa8780bd9d4a2254dc9194b8b0
+
+
+Saliency vector problem:
+
+(notation: capitals are vectors, lowercase are scalars, space between all variables to allow for indexes)
+
+Find closest crossing on two lines defined by Pa = Ba + a Na and Pb = Bb + b Nb, where Ba and Bb are the starting points of the lines (the cameras), Na and Nb the direction vectors (from the saliency detection algorithm) and a and b the scalar parameters of the closest points.
+
+Start by understanding that the line between Ba + a Na and Bb + b Nb is perpendicular to both lines, so:
+
+(Bb + b Nb - Ba - a Na) . b Nb = 0
+(Bb + b Nb - Ba - a Na) . a Na = 0
+
+Vector dot products are distributive:
+
+Bb . b Nb + b Nb . b Nb - Ba . b Nb - a Na . b Nb = 0
+Bb . a Na + b Nb . a Na - Ba . a Na - a Na . a Na = 0
+
+Notice that this is actually a scalar problem:
+
+c = Bb . Nb
+d = Nb . Nb
+e = Ba . Nb
+f = Na . Nb
+g = Bb . Na
+h = Nb . Na
+i = Ba . Na
+j = Na . Na
+
+Substitute:
+
+b c + b b d - b e - a b f = 0
+a g + b a h - a i - a a j = 0
+
+Remove 0-roots from both equations:
+
+c + b d - e - a f = 0
+g + b h - i - a j = 0
+
+Extract b in both equations:
+
+b = (e - c + a f) / d
+b = (i - g + a j) / h
+
+Equate:
+
+(e - c + a f) / d = (i - g + a j) / h
+
+Expand:
+
+e h - c h + a f h = i d - g d + a j d
+
+Extract a:
+
+a = (i d - g d - e h + c h) / (f h - j d)
+
+Substitute into either one of the starting equations to find b
+
+The salient points that are closer than a certain threshold sqrt((Pa - Pb) . (Pa - Pb)) can be fused
