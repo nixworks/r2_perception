@@ -22,7 +22,7 @@ class FaceAnalysis(object):
 
     def __init__(self):
 
-        self.analysis_dir = rospy.get_param("/analysis_dir")
+        self.analysis_dir = rospy.get_param("/analysis_temp_dir")
 
         self.request_sub = rospy.Subscriber("face_request",FaceRequest,self.HandleFaceRequest)
         self.response_pub = rospy.Publisher("face_response",FaceResponse,queue_size=5)

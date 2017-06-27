@@ -9,7 +9,8 @@ import rospy
 import numpy
 import time
 import cv2
-import tf2_ros
+import tf
+import geometry_msgs
 from dynamic_reconfigure.server import Server
 from r2_perception.cfg import VisionConfig
 from sensor_msgs.msg import Image
@@ -18,9 +19,10 @@ from math import sqrt
 from r2_perception.msg import Face,Hand,Saliency,FaceRequest,FaceResponse,CandidateUser,CandidateHand,CandidateSaliency
 from visualization_msgs.msg import Marker
 from threading import Lock
+from geometry_msgs.msg import PointStamped
+
 
 opencv_bridge = CvBridge()
-
 
 thumb_ext = ".png"
 
@@ -37,7 +39,7 @@ saliency_continuity_threshold_m = 0.3
 minimum_confidence = 0.4
 
 # maximum extrapolation time (seconds)
-time_difference = rospy.Time(0,500000000)
+time_difference = rospy.Time(1,0)
 
 # number of points needed for full confidence
 full_points = 5
@@ -390,7 +392,7 @@ class VisionPipeline(object):
 
         self.lock = Lock()
 
-        self.thumbs_dir = rospy.get_param("/thumbs_dir")
+        self.thumbs_base_dir = rospy.get_param("/thumbs_dir")
 
         self.debug = rospy.get_param("/debug")
         self.store_thumbs = rospy.get_param("/store_thumbs")
@@ -413,7 +415,7 @@ class VisionPipeline(object):
         if self.store_thumbs:
             today_tag = time.strftime("%Y%m%d")
             camera_tag = self.name + "_%08X" % (self.camera_id & 0xFFFFFFFF)
-            self.thumb_dir = self.thumbs_dir + "/" + today_tag + "/" + self.session_tag + "_%08X/" % (self.session_id & 0xFFFFFFFF) + camera_tag + "/"
+            self.thumb_dir = self.thumbs_base_dir + "/" + today_tag + "/" + self.session_tag + "_%08X/" % (self.session_id & 0xFFFFFFFF) + camera_tag + "/"
             if not os.path.exists(self.thumb_dir):
                 os.makedirs(self.thumb_dir)
 
@@ -422,8 +424,7 @@ class VisionPipeline(object):
         self.csaliencies = {}
 
         # start listening to transforms
-        self.buffer = tf2_ros.Buffer()
-        self.listener = tf2_ros.TransformListener(self.buffer)
+        self.listener = tf.TransformListener()
 
         # start timer
         self.timer = rospy.Timer(rospy.Duration(1.0 / self.vision_rate),self.HandleTimer)
@@ -705,7 +706,7 @@ class VisionPipeline(object):
         marker.color.r = 1.0
         marker.color.g = 0.0
         marker.color.b = 0.0
-        marker.color.a = 1.0
+        marker.color.a = 0.5
         marker.lifetime = rospy.Duration(2,0)
         marker.frame_locked = False
         self.face_rviz_pub.publish(marker)
@@ -731,7 +732,7 @@ class VisionPipeline(object):
         marker.color.r = 0.7
         marker.color.g = 0.7
         marker.color.b = 0.7
-        marker.color.a = 1.0
+        marker.color.a = 0.5
         if self.cusers[cuser_id].gender == 2:
             gender = "female"
         else:
@@ -765,7 +766,7 @@ class VisionPipeline(object):
         marker.color.r = 0.0
         marker.color.g = 1.0
         marker.color.b = 0.0
-        marker.color.a = 1.0
+        marker.color.a = 0.5
         marker.lifetime = rospy.Duration(2,0)
         marker.frame_locked = False
         self.hand_rviz_pub.publish(marker)
@@ -791,7 +792,7 @@ class VisionPipeline(object):
         marker.color.r = 0.7
         marker.color.g = 0.7
         marker.color.b = 0.7
-        marker.color.a = 1.0
+        marker.color.a = 0.5
         marker.text = self.name + " hand: "
         for gesture in gestures:
             marker.text += " " + gesture
@@ -822,42 +823,44 @@ class VisionPipeline(object):
                     else:
                         cuser = self.cusers[cuser_id].faces[-1]
 
-                    # make a PointStamped structure to satisfy TF
-                    #ps = PointStamped()
-                    #ps.header.seq = 0
-                    #ps.header.stamp = ts
-                    #ps.header.frame_id = self.name
-                    #ps.point.x = cuser.position.x
-                    #ps.point.y = cuser.position.y
-                    #ps.point.z = cuser.position.z
+                    if self.listener.canTransform("world",self.name,ts):
 
-                    # transform to world coordinates
-                    #pst = tf2_geometry_msgs.do_transform_point(ps,transform)
+                        # make a PointStamped structure to satisfy TF
+                        ps = PointStamped()
+                        ps.header.seq = 0
+                        ps.header.stamp = ts
+                        ps.header.frame_id = self.name
+                        ps.point.x = cuser.position.x
+                        ps.point.y = cuser.position.y
+                        ps.point.z = cuser.position.z
 
-                    # setup candidate user message
-                    msg = CandidateUser()
-                    msg.session_id = self.session_id
-                    msg.camera_id = self.camera_id
-                    msg.cuser_id = cuser_id
-                    msg.ts = ts
-                    #msg.position.x = pst.point.x
-                    #msg.position.y = pst.point.y
-                    #msg.position.z = pst.point.z
-                    msg.position.x = cuser.position.x
-                    msg.position.y = cuser.position.y
-                    msg.position.z = cuser.position.z
-                    msg.confidence = cuser.confidence
-                    msg.smile = cuser.smile
-                    msg.frown = cuser.frown
-                    msg.expressions = cuser.expressions
-                    #msg.landmarks = cuser.landmarks
-                    msg.age = self.cusers[cuser_id].age
-                    msg.age_confidence = self.cusers[cuser_id].age_confidence
-                    msg.gender = self.cusers[cuser_id].gender
-                    msg.gender_confidence = self.cusers[cuser_id].gender_confidence
-                    msg.identity = self.cusers[cuser_id].identity
-                    msg.identity_confidence = self.cusers[cuser_id].identity_confidence
-                    self.cuser_pub.publish(msg)
+                        # transform to world coordinates
+                        pst = self.listener.transformPoint("world",ps)
+
+                        # setup candidate user message
+                        msg = CandidateUser()
+                        msg.session_id = self.session_id
+                        msg.camera_id = self.camera_id
+                        msg.cuser_id = cuser_id
+                        msg.ts = ts
+                        msg.position.x = pst.point.x
+                        msg.position.y = pst.point.y
+                        msg.position.z = pst.point.z
+                        #msg.position.x = cuser.position.x
+                        #msg.position.y = cuser.position.y
+                        #msg.position.z = cuser.position.z
+                        msg.confidence = cuser.confidence
+                        msg.smile = cuser.smile
+                        msg.frown = cuser.frown
+                        msg.expressions = cuser.expressions
+                        #msg.landmarks = cuser.landmarks
+                        msg.age = self.cusers[cuser_id].age
+                        msg.age_confidence = self.cusers[cuser_id].age_confidence
+                        msg.gender = self.cusers[cuser_id].gender
+                        msg.gender_confidence = self.cusers[cuser_id].gender_confidence
+                        msg.identity = self.cusers[cuser_id].identity
+                        msg.identity_confidence = self.cusers[cuser_id].identity_confidence
+                        self.cuser_pub.publish(msg)
 
                     # output markers to rviz
                     if self.visualization and self.visualize_pipeline:
@@ -885,32 +888,34 @@ class VisionPipeline(object):
                     else:
                         chand = self.chands[chand_id].hands[-1]
 
-                    # make a PointStamped structure to satisfy TF
-                    #ps = PointStamped()
-                    #ps.header.seq = 0
-                    #ps.header.stamp = ts
-                    #ps.header.frame_id = self.name
-                    #ps.point.x = chand.position.x
-                    #ps.point.y = chand.position.y
-                    #ps.point.z = chand.position.z
+                    if self.listener.canTransform("world",self.name,ts):
 
-                    # transform to world coordinates
-                    #pst = tf2_geometry_msgs.do_transform_point(ps,transform)
+                        # make a PointStamped structure to satisfy TF
+                        ps = PointStamped()
+                        ps.header.seq = 0
+                        ps.header.stamp = ts
+                        ps.header.frame_id = self.name
+                        ps.point.x = chand.position.x
+                        ps.point.y = chand.position.y
+                        ps.point.z = chand.position.z
 
-                    # setup candidate hand message
-                    msg = CandidateHand()
-                    msg.session_id = self.session_id
-                    msg.camera_id = self.camera_id
-                    msg.chand_id = chand_id
-                    msg.ts = ts
-                    #msg.position.x = pst.point.x
-                    #msg.position.y = pst.point.y
-                    #msg.position.z = pst.point.z
-                    msg.position.x = chand.position.x
-                    msg.position.y = chand.position.y
-                    msg.position.z = chand.position.z
-                    msg.confidence = chand.confidence
-                    self.chand_pub.publish(msg)
+                        # transform to world coordinates
+                        pst = self.listener.transformPoint("world",ps)
+
+                        # setup candidate hand message
+                        msg = CandidateHand()
+                        msg.session_id = self.session_id
+                        msg.camera_id = self.camera_id
+                        msg.chand_id = chand_id
+                        msg.ts = ts
+                        #msg.position.x = pst.point.x
+                        #msg.position.y = pst.point.y
+                        #msg.position.z = pst.point.z
+                        msg.position.x = chand.position.x
+                        msg.position.y = chand.position.y
+                        msg.position.z = chand.position.z
+                        msg.confidence = chand.confidence
+                        self.chand_pub.publish(msg)
 
                     # output markers to rviz
                     if self.visualization and self.visualize_pipeline:
@@ -966,7 +971,7 @@ class VisionPipeline(object):
                         marker.color.r = 0.0
                         marker.color.g = 0.0
                         marker.color.b = 1.0
-                        marker.color.a = 1.0
+                        marker.color.a = 0.5
                         marker.lifetime = rospy.Duration(2,0)
                         marker.frame_locked = False
                         self.saliency_rviz_pub.publish(marker)

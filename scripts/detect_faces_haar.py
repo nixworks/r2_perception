@@ -30,7 +30,6 @@ from threading import Lock
 
 # create OpenCV-ROS bridge object
 opencv_bridge = CvBridge()
-face_cascade = cv2.CascadeClassifier(os.getenv("HOME") + )
 
 
 # Generate unique serial number for the raw faces 

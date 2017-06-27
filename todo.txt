@@ -37,13 +37,13 @@ TODO:
 + fuse observations (cusers between pipelines, chands between pipelines, saliency points between pipelines, cusers+saliency points, hands+saliency points, sounds+cusers, sounds+hands, sounds+salient points, speech+cusers, speech+salient points)
 + output established users, hands, salient points and speech
 + documentation of everything
++ output sounds and speech to directories and CSV
++ implement saliency for RealSense (needs video rescale and faster way to do the OpenCV algorithms)
++ make all nodes properly listen to dynamic reconfigure, see also Parametrize - why does dynamic reconfigure reset the parameters?
++ convert saliency to 3D by crossing beams in fusion.py (fuse saliency)
++ research how to use dynamic reconfigure in RealSense directly
 - short-term solution for face identification? Mandeep? Ralf?
-
-There is no complete robot (with working eyes, neck, wideangle and realsense to test and tweak all details)
-
-Visualization TODO:
-
-+ visualize candidate saliency unit vectors in rviz
+- detect_saliency: also output the actual feature it triggered on
 - visualize established users in rviz
 - visualize established saliency in rviz
 - visualize only resulting observations, or both with transparency
@@ -62,15 +62,6 @@ Parametrize:
 
 
 Back home:
-
-+ output sounds and speech to directories and CSV
-+ hook up speech and audio localization from both microphones
-+ implement saliency for RealSense (needs video rescale and faster way to do the OpenCV algorithms)
-+ make all nodes properly listen to dynamic reconfigure, see also Parametrize - why does dynamic reconfigure reset the parameters?
-+ convert saliency to 3D by crossing beams in fusion.py (fuse saliency)
-+ research how to use dynamic reconfigure in RealSense directly
-
-	try with logitech on left or right side of screen (i.e. update model)
 
 - audio detection and streaming, refactor audio_stream and audio_sensor
 
@@ -115,8 +106,6 @@ Descoped for now, coming back to later:
 
 - solve timing problem between Linux and Windows (first send ROS message to RealSense, wait for answer, the time difference divided by 2 is the general delay between Windows and Linux), this is not a problem right now, RealSense seems to be reasonably fast
 
-- detect_saliency: also output the actual feature it triggered on
-
 - research which of the nodes could potentially be C++ and/or combined
 
 - small node or C++ code that gets continuous feeds from all cameras, scales down the images and present them to all interested parties on the system
@@ -125,9 +114,7 @@ Descoped for now, coming back to later:
 
 - clean up RealSense code only for this
 
-- research octomap...
-
-- fix dynamic parameters
+- research octomap / SpaceTimeMap
 
 
 Towards OpenCog:

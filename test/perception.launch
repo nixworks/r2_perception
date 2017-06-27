@@ -4,22 +4,22 @@
 	<arg name="name"/>
 
 	<!-- Haar Cascade resource for detect_faces_haar.py -->
-	<param name="haar_cascade" value="/hansonrobotics/release/scripts/haarcascade_frontalface_alt.xml"/>
+	<param name="haar_cascade" value="$(env HOME)/hansonrobotics/release/scripts/haarcascade_frontalface_alt.xml"/>
 
 	<!-- temporary directory for face analysis -->
-	<param name="analysis_dir" value="/hansonrobotics/release/scripts"/>
+	<param name="analysis_temp_dir" value="$(env HOME)/hansonrobotics/release/scripts"/>
 
-	<!-- sounds directory -->
-	<param name="sounds_dir" value="/hansonrobotics/release/scripts/sounds"/>
+	<!-- directory to store thumbnails, if "store_thumbs" is true -->
+	<param name="thumbs_dir" value="$(env HOME)/hansonrobotics/release/scripts/thumbs"/>
 
-	<!-- thumbnail directory -->
-	<param name="thumbs_dir" value="/hansonrobotics/release/scripts/thumbs"/>
-
+	<!-- directory to store sounds, if "store_sounds" is true -->
+	<param name="sounds_dir" value="$(env HOME)/hansonrobotics/release/scripts/sounds"/>
+	
 	<!-- geometry description -->
 	<param name="robot_description" textfile="$(env HOME)/hansonrobotics/release/scripts/robot.urdf"/>
 
 	<!-- whether or not to show camera feed debug windows -->
-	<param name="debug" value="true"/>
+	<param name="debug" value="false"/>
 
 	<!-- whether or not to store all thumbnails from the cameras -->
 	<param name="store_thumbs" value="false"/>
@@ -77,7 +77,7 @@
 			</group>
 
 			<!-- right eye camera -->
-			<!--<group ns="righteye">
+			<group ns="righteye">
 				<param name="fovy" value="1.2"/>
 				<param name="aspect" value="1.33333"/>
 				<param name="rotate" value="90"/>
@@ -100,11 +100,11 @@
 				<node name="detect_saliency" type="detect_saliency_ittikoch.py" pkg="r2_perception"/>
 				<node name="face_analysis" type="face_analysis.py" pkg="r2_perception"/>
 				<node name="vision_pipeline" type="vision_pipeline.py" pkg="r2_perception"/>
-			</group>-->
+			</group>
 
 			<!-- RealSense camera -->
 			<group ns="realsense">
-				<param name="fovy" value="1.0"/> <!-- not used for RealSense -->
+				<param name="fovy" value="1.0"/>
 				<param name="aspect" value="1.33333"/>
 				<param name="camera_rate" value="10.0"/>
 				<param name="rotate" value="0"/>
@@ -126,8 +126,8 @@
 				<param name="aspect" value="1.33333"/>
 				<param name="camera_rate" value="10.0"/>
 				<param name="rotate" value="0"/>
-				<param name="face_detect_rate" value="10.0"/>
-				<param name="hand_detect_rate" value="1.0"/>
+				<param name="face_detect_rate" value="20.0"/>
+				<param name="hand_detect_rate" value="5.0"/>
 				<param name="saliency_detect_rate" value="5.0"/>
 				<param name="vision_rate" value="20.0"/>
 				<param name="face_regression" value="true"/>
@@ -147,7 +147,7 @@
 			</group>
 
 			<!-- Acoustic Magic microphone array -->
-			<group ns="acousticmagic">
+			<!--<group ns="acousticmagic">
 				<param name="device" value="hw:2,0"/>
 				<param name="threshold" value="0.3"/>
 				<param name="linger" value="0.2"/>
@@ -156,12 +156,12 @@
 				<param name="localization" value="true"/>
 				<param name="port" value="/dev/ttyUSB0"/>
 				<node name="detect_sound" type="detect_sound_hyst.py" pkg="r2_perception"/>
-				<!--<node name="speech_to_text_google" type="speech_to_text.py" pkg="r2_perception"/>-->
+				<node name="speech_to_text_google" type="speech_to_text.py" pkg="r2_perception"/>
 				<node name="hearing_pipeline" type="hearing_pipeline.py" pkg="r2_perception"/>
-			</group>
+			</group>-->
 
 			<!-- handheld microphone -->
-			<group ns="handheld">
+			<!--<group ns="handheld">
 				<param name="device" value="hw:1,0"/>
 				<param name="threshold" value="0.3"/>
 				<param name="linger" value="0.2"/>
@@ -170,9 +170,9 @@
 				<param name="localization" value="false"/>
 				<param name="port" value="/dev/ttyUSB0"/>
 				<node name="detect_sound" type="detect_sound_hyst.py" pkg="r2_perception"/>
-				<!--<node name="speech_to_text_google" type="speech_to_text.py" pkg="r2_perception"/>-->
+				<node name="speech_to_text_google" type="speech_to_text.py" pkg="r2_perception"/>
 				<node name="hearing_pipeline" type="hearing_pipeline.py" pkg="r2_perception"/>
-			</group>
+			</group>-->
 
 			<!-- fusion node -->
 			<node name="fusion" type="fusion.py" pkg="r2_perception"/>

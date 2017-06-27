@@ -18,10 +18,10 @@ class HearingPipeline(object):
 
     def __init__(self):
 
+        self.sounds_base_dir = rospy.get_param("/sounds_dir")
+
         self.name = rospy.get_namespace().split('/')[-2]
-
-        self.sounds_dir = rospy.get_param("/sounds_dir")
-
+        
         self.session_tag = str(rospy.get_param("/session_tag"))
         self.session_id = hash(self.session_tag) & 0xFFFFFFFF
 
@@ -29,9 +29,9 @@ class HearingPipeline(object):
 
         today_tag = time.strftime("%Y%m%d")
         microphone_tag = self.name + "_%08X" % (self.microphone_id & 0xFFFFFFFF)
-        self.sound_dir = self.sounds_dir + "/" + today_tag + "/" + self.session_tag + "_%08X/" % (self.session_id & 0xFFFFFFFF) + microphone_tag + "/"
-        if not os.path.exists(self.sound_dir):
-            os.makedirs(self.sound_dir)
+        self.sounds_dir = self.sounds_base_dir + "/" + today_tag + "/" + self.session_tag + "_%08X/" % (self.session_id & 0xFFFFFFFF) + microphone_tag + "/"
+        if not os.path.exists(self.sounds_dir):
+            os.makedirs(self.sounds_dir)
 
         self.pusers = {}
 
@@ -53,7 +53,7 @@ class HearingPipeline(object):
     def HandleSound(self,data):
 
         sound_tag = "sound_%08X" % (data.sound_id & 0xFFFFFFFF)
-        sound_file = self.sound_dir + sound_tag + ".wav"
+        sound_file = self.sounds_dir + sound_tag + ".wav"
         # write sound
 
 

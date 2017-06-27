@@ -65,6 +65,9 @@ class DetectSaliency(object):
         self.cur_ts = 0.0
         self.last_ts = 0.0
 
+        # get global parameters
+        self.debug = rospy.get_param("/debug")
+
         # get local parameters
         self.fovy = rospy.get_param("fovy")
         self.aspect = rospy.get_param("aspect")
@@ -81,9 +84,10 @@ class DetectSaliency(object):
         self.image_sub = rospy.Subscriber("camera/image_raw",Image,self.HandleImage)
         self.saliency_pub = rospy.Publisher("raw_saliency",Saliency,queue_size=5)
 
-        # debugging: 
-        cv2.startWindowThread()
-        cv2.namedWindow("faux saliency")
+        # debugging:
+        if self.debug:
+            cv2.startWindowThread()
+            cv2.namedWindow("faux saliency")
 
 
     def HandleConfig(self,data):
@@ -208,13 +212,6 @@ class DetectSaliency(object):
                 cv2.circle(scratch,(point.x,point.y),20,0,-1)
 
             # convert to messages and send off
-
-            # the idea is that these messages signal the existance of salient points in the camera image to the fusion layer
-            # there, a collection of possibly salient directions is maintained and tracked, like the faces
-
-            # later on, the AI can select which of these salient directions is interesting to watch,
-            # and have the robot cycle through them at random; the robot will then appear to be glancing
-            # at interesting things
             for point in points:
                 msg = Saliency()
                 msg.saliency_id = GenerateSaliencyID()
@@ -225,7 +222,8 @@ class DetectSaliency(object):
 
                 self.saliency_pub.publish(msg)
 
-            cv2.imshow("faux saliency",cv2.resize(resized,(subx,suby),interpolation=cv2.INTER_LINEAR))
+            if self.debug:
+                cv2.imshow("faux saliency",cv2.resize(resized,(subx,suby),interpolation=cv2.INTER_LINEAR))
 
 
 if __name__ == '__main__':
