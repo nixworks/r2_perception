@@ -4,25 +4,25 @@
 	<arg name="name"/>
 
 	<!-- Haar Cascade resource for detect_faces_haar.py -->
-	<param name="haar_cascade" value="$(env HOME)/hansonrobotics/release/scripts/haarcascade_frontalface_alt.xml"/>
+	<param name="haar_cascade" value="$(find r2_perception)/test/haarcascade_frontalface_alt.xml"/>
 
 	<!-- temporary directory for face analysis -->
-	<param name="analysis_temp_dir" value="$(env HOME)/hansonrobotics/release/scripts"/>
+	<param name="analysis_temp_dir" value="$(find r2_perception)/test"/>
 
 	<!-- directory to store thumbnails, if "store_thumbs" is true -->
-	<param name="thumbs_dir" value="$(env HOME)/hansonrobotics/release/scripts/thumbs"/>
+	<param name="thumbs_dir" value="$(find r2_perception)/test/thumbs"/>
 
 	<!-- directory to store sounds, if "store_sounds" is true -->
-	<param name="sounds_dir" value="$(env HOME)/hansonrobotics/release/scripts/sounds"/>
+	<param name="sounds_dir" value="$(find r2_perception)/test/sounds"/>
 	
 	<!-- geometry description -->
-	<param name="robot_description" textfile="$(env HOME)/hansonrobotics/release/scripts/robot.urdf"/>
+	<param name="robot_description" textfile="$(find r2_perception)/test/robot.urdf"/>
 
 	<!-- whether or not to show camera feed debug windows -->
-	<param name="debug" value="false"/>
+	<param name="debug" value="true"/>
 
 	<!-- whether or not to store all thumbnails from the cameras -->
-	<param name="store_thumbs" value="false"/>
+	<param name="store_thumbs" value="true"/>
 
 	<!-- whether or not to store all sounds from the microphones -->
 	<param name="store_sounds" value="false"/>
@@ -51,7 +51,7 @@
 		<group ns="perception">
 
 			<!-- left eye camera -->
-			<group ns="lefteye">
+			<!--<group ns="lefteye">
 				<param name="fovy" value="1.2"/>
 				<param name="aspect" value="1.33333"/>
 				<param name="rotate" value="-90"/>
@@ -74,10 +74,10 @@
 				<node name="detect_saliency" type="detect_saliency_ittikoch.py" pkg="r2_perception"/>
 				<node name="face_analysis" type="face_analysis_openbr.py" pkg="r2_perception"/>
 				<node name="vision_pipeline" type="vision_pipeline.py" pkg="r2_perception"/>
-			</group>
+			</group>-->
 
 			<!-- right eye camera -->
-			<group ns="righteye">
+			<!--<group ns="righteye">
 				<param name="fovy" value="1.2"/>
 				<param name="aspect" value="1.33333"/>
 				<param name="rotate" value="90"/>
@@ -100,7 +100,7 @@
 				<node name="detect_saliency" type="detect_saliency_ittikoch.py" pkg="r2_perception"/>
 				<node name="face_analysis" type="face_analysis.py" pkg="r2_perception"/>
 				<node name="vision_pipeline" type="vision_pipeline.py" pkg="r2_perception"/>
-			</group>
+			</group>-->
 
 			<!-- RealSense camera -->
 			<group ns="realsense">
@@ -178,7 +178,7 @@
 			<node name="fusion" type="fusion.py" pkg="r2_perception"/>
 
 			<!-- visualization of perception/input/sensor fusion -->
-			<node name="rviz" type="rviz" pkg="rviz" args="-d $(env HOME)/hansonrobotics/release/scripts/urdf.rviz"/>
+			<node name="rviz" type="rviz" pkg="rviz" args="-d $(find r2_perception)/test/urdf.rviz"/>
 
 		</group>
 

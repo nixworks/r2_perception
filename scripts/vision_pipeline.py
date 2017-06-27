@@ -12,7 +12,7 @@ import cv2
 import tf
 import geometry_msgs
 from dynamic_reconfigure.server import Server
-from r2_perception.cfg import VisionConfig
+from r2_perception.cfg import vision_pipelineConfig as VisionConfig
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 from math import sqrt
