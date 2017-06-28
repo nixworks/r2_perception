@@ -51,7 +51,7 @@
 		<group ns="perception">
 
 			<!-- left eye camera -->
-			<!--<group ns="lefteye">
+			<group ns="lefteye">
 				<param name="fovy" value="1.2"/>
 				<param name="aspect" value="1.33333"/>
 				<param name="rotate" value="-90"/>
@@ -74,7 +74,7 @@
 				<node name="detect_saliency" type="detect_saliency_ittikoch.py" pkg="r2_perception"/>
 				<node name="face_analysis" type="face_analysis_openbr.py" pkg="r2_perception"/>
 				<node name="vision_pipeline" type="vision_pipeline.py" pkg="r2_perception"/>
-			</group>-->
+			</group>
 
 			<!-- right eye camera -->
 			<!--<group ns="righteye">

@@ -24,6 +24,7 @@ import rospy
 import numpy
 import time
 import cv2
+import math
 import dynamic_reconfigure.client
 from sensor_msgs.msg import Image
 from r2_perception.msg import Saliency,Float32XYZ
@@ -48,6 +49,17 @@ def cv2normalize(image):
     dest = image.copy()
     cv2.normalize(cv2.absdiff(image,0.0),dest,0.0,1.0,cv2.NORM_MINMAX)
     return dest
+
+
+class FoundPoint(object):
+
+    def __init__(self):
+
+        self.position = (0,0,0)
+        self.motion = 0
+        self.vmap = 0
+        self.umap = 0
+        self.contrast = 0
 
 
 class DetectSaliency(object):
@@ -195,6 +207,8 @@ class DetectSaliency(object):
             # add all together
             total = motion * motion_factor + vmap * color_factor + umap * color_factor + contrast * contrast_factor
 
+            cpd = 1.0 / math.tan(self.fovy)
+
             # find successively brightest points in a much lower resolution result
             resized = cv2.resize(total,(covx,covy),interpolation=cv2.INTER_LINEAR)
             scratch = resized.copy()
@@ -205,21 +219,43 @@ class DetectSaliency(object):
                 for y in range(0,covy):
                     for x in range(0,covx):
                         if scratch[y,x] > point.z:
-                            point.x = x
-                            point.y = y
+                            point.x = float(x) / float(covx)
+                            point.y = float(y) / float(covy)
                             point.z = scratch[y,x]
                 points.append(point)
-                cv2.circle(scratch,(point.x,point.y),20,0,-1)
+                cv2.circle(scratch,(int(point.x * float(covx)),int(point.y * float(covy))),20,0,-1)
 
             # convert to messages and send off
             for point in points:
+
+                # convert camera coordinates to normalized coordinates on the camera plane
+                fy = (1.0 - 2.0 * point.x) / cpd
+                fz = (1.0 - 2.0 * point.y) / cpd
+                fx = 1.0
+
+                # normalize
+                flen = math.sqrt(fx * fx + fy * fy + fz * fz)
+                if flen != 0.0:
+                    fx /= flen
+                    fy /= flen
+                    fz /= flen
+
+                # get coordinates on feature maps
+                x = int(point.x * float(subx))
+                y = int(point.y * float(suby))
+
+                # and send off
                 msg = Saliency()
                 msg.saliency_id = GenerateSaliencyID()
                 msg.ts = self.cur_ts
-                msg.position.x = -1.0 + 2.0 * (point.x / float(covx))
-                msg.position.y = -1.0 + 2.0 * (point.y / float(covy))
-                msg.confidence = point.z
-
+                msg.direction.x = fx
+                msg.direction.y = fy
+                msg.direction.z = fz
+                msg.motion = motion[y,x] * motion_factor
+                msg.umap = umap[y,x] * color_factor
+                msg.vmap = vmap[y,x] * color_factor
+                msg.contrast = contrast[y,x] * contrast_factor
+                msg.confidence = 1.0
                 self.saliency_pub.publish(msg)
 
             if self.debug:
