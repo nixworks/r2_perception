@@ -1,0 +1,8 @@
+TODO:
+
+* unit vector saliency
+* saliency in rviz
++ fusion results
+- transform unit vectors to world coordinates, i.e. normals...
+- RealSense saliency
+- OpenBiometrics ubuntu apt-get package

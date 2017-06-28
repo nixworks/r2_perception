@@ -10,6 +10,7 @@ import numpy
 import time
 import cv2
 import tf
+import math
 import geometry_msgs
 from dynamic_reconfigure.server import Server
 from r2_perception.cfg import vision_pipelineConfig as VisionConfig
@@ -19,7 +20,7 @@ from math import sqrt
 from r2_perception.msg import Face,Hand,Saliency,FaceRequest,FaceResponse,CandidateUser,CandidateHand,CandidateSaliency
 from visualization_msgs.msg import Marker
 from threading import Lock
-from geometry_msgs.msg import PointStamped
+from geometry_msgs.msg import Point,PointStamped
 
 
 opencv_bridge = CvBridge()
@@ -399,6 +400,7 @@ class VisionPipeline(object):
         self.visualization = rospy.get_param("/visualization")
         self.visualize_pipeline = rospy.get_param("/visualize_pipeline")
 
+        self.fovy = rospy.get_param("fovy")
         self.rotate = rospy.get_param("rotate")
         self.vision_rate = rospy.get_param("vision_rate")
         self.face_regression = rospy.get_param("face_regression")
@@ -576,9 +578,10 @@ class VisionPipeline(object):
                     saliency = self.csaliencies[csaliency_id].Extrapolate(data.ts)
                 else:
                     saliency = self.csaliencies[csaliency_id].saliencies[-1]
-                dx = data.position.x - saliency.position.x
-                dy = data.position.y - saliency.position.y
-                d = sqrt(dx * dx + dy * dy)
+                dx = data.direction.x - saliency.direction.x
+                dy = data.direction.y - saliency.direction.y
+                dz = data.direction.z - saliency.direction.z
+                d = sqrt(dx * dx + dy * dy + dz * dz)
                 if (closest_csaliency_id == 0) or (d < closest_dist):
                     closest_csaliency_id = csaliency_id
                     closest_dist = d
@@ -676,9 +679,15 @@ class VisionPipeline(object):
                     point = self.csaliencies[csaliency_id].Extrapolate(ts)
                 else:
                     point = self.csaliencies[csaliency_id].saliencies[-1]
-                x = int((0.5 + 0.5 * point.position.x) * float(subx))
-                y = int((0.5 + 0.5 * point.position.y) * float(suby))
-                cv2.circle(cvimage,(x,y),10,(255,0,0),2)
+
+                # convert unit vector back to 2D camera position
+                cpd = 1.0 / math.tan(self.fovy)
+                fx = 1.0
+                fy = point.direction.y / point.direction.x
+                fz = point.direction.z / point.direction.x
+                px = int(0.5 * (1.0 - fy * cpd) * float(subx))
+                py = int(0.5 * (1.0 - fz * cpd) * float(suby))
+                cv2.circle(cvimage,(px,py),10,(255,0,0),2)
 
             cv2.imshow(self.name,cvimage)
 
@@ -745,7 +754,7 @@ class VisionPipeline(object):
 
     def SendHandMarkers(self,frame_id,ts,chand_id,ns,position,gestures):
 
-        # the face
+        # the hand
         marker = Marker()
         marker.header.frame_id = frame_id
         marker.header.stamp = ts
@@ -801,6 +810,39 @@ class VisionPipeline(object):
         self.hand_rviz_pub.publish(marker)
 
 
+    def SendSaliencyMarker(self,frame_id,ts,csaliency_id,ns,direction):
+
+        # the arrow
+        marker = Marker()
+        marker.header.frame_id = frame_id
+        marker.header.stamp = ts
+        marker.id = csaliency_id
+        marker.ns = ns
+        marker.type = Marker.ARROW
+        marker.action = Marker.MODIFY
+        marker.pose.position.x = 0
+        marker.pose.position.y = 0
+        marker.pose.position.z = 0
+        marker.pose.orientation.x = 0.0
+        marker.pose.orientation.y = 0.0
+        marker.pose.orientation.z = 0.0
+        marker.pose.orientation.w = 1.0
+        marker.scale.x = 0.01
+        marker.scale.y = 0.03
+        marker.scale.z = 0.08
+        marker.color.r = 0.0
+        marker.color.g = 0.0
+        marker.color.b = 1.0
+        marker.color.a = 0.5
+        points = []
+        points.append(Point(0.0,0.0,0.0))
+        points.append(Point(direction.x,direction.y,direction.z))
+        marker.points = points
+        marker.lifetime = rospy.Duration.from_sec(0.1)
+        marker.frame_locked = False
+        self.saliency_rviz_pub.publish(marker)
+
+
     def HandleTimer(self,data):
 
         global minimum_confidence
@@ -808,11 +850,9 @@ class VisionPipeline(object):
 
         ts = data.current_expected
 
-        #transform = self.buffer.lookup_transform(self.name,"world",ts)
-
         with self.lock:
 
-            # mine the current candidate users for confident ones
+            # mine the current candidate users for confident ones and send them off
             for cuser_id in self.cusers:
                 conf = self.cusers[cuser_id].CalculateConfidence()
                 if conf >= minimum_confidence:
@@ -846,14 +886,10 @@ class VisionPipeline(object):
                         msg.position.x = pst.point.x
                         msg.position.y = pst.point.y
                         msg.position.z = pst.point.z
-                        #msg.position.x = cuser.position.x
-                        #msg.position.y = cuser.position.y
-                        #msg.position.z = cuser.position.z
                         msg.confidence = cuser.confidence
                         msg.smile = cuser.smile
                         msg.frown = cuser.frown
                         msg.expressions = cuser.expressions
-                        #msg.landmarks = cuser.landmarks
                         msg.age = self.cusers[cuser_id].age
                         msg.age_confidence = self.cusers[cuser_id].age_confidence
                         msg.gender = self.cusers[cuser_id].gender
@@ -877,7 +913,7 @@ class VisionPipeline(object):
                 del self.cusers[key]
 
 
-            # mine the current candidate hands for confident ones
+            # mine the current candidate hands for confident ones and send them off
             for chand_id in self.chands:
                 conf = self.chands[chand_id].CalculateConfidence()
                 if conf >= minimum_confidence:
@@ -908,12 +944,9 @@ class VisionPipeline(object):
                         msg.camera_id = self.camera_id
                         msg.chand_id = chand_id
                         msg.ts = ts
-                        #msg.position.x = pst.point.x
-                        #msg.position.y = pst.point.y
-                        #msg.position.z = pst.point.z
-                        msg.position.x = chand.position.x
-                        msg.position.y = chand.position.y
-                        msg.position.z = chand.position.z
+                        msg.position.x = pst.point.x
+                        msg.position.y = pst.point.y
+                        msg.position.z = pst.point.z
                         msg.confidence = chand.confidence
                         self.chand_pub.publish(msg)
 
@@ -932,7 +965,7 @@ class VisionPipeline(object):
                 del self.chands[key]
 
 
-            # mine the current candidate saliencies for confident ones
+            # mine the current candidate saliencies for confident ones and send them off
             for csaliency_id in self.csaliencies:
                 conf = self.csaliencies[csaliency_id].CalculateConfidence()
                 if conf >= minimum_confidence:
@@ -945,36 +978,13 @@ class VisionPipeline(object):
                         csaliency = self.csaliencies[csaliency_id].Extrapolate(ts)
                     else:
                         csaliency = self.csaliencies[csaliency_id].saliencies[-1]
-                    msg.position = csaliency.position
+                    msg.direction = csaliency.direction
                     msg.confidence = csaliency.confidence
                     self.csaliency_pub.publish(msg)
 
                     # output markers to rviz
                     if self.visualization and self.visualize_pipeline:
-                        marker = Marker()
-                        marker.header.frame_id = self.name
-                        marker.header.stamp = ts
-                        marker.id = csaliency_id
-                        marker.ns = "/robot/perception/" + self.name
-                        marker.type = Marker.SPHERE
-                        marker.action = Marker.MODIFY
-                        marker.pose.position.x = csaliency.position.x
-                        marker.pose.position.y = csaliency.position.y
-                        marker.pose.position.z = 0.0
-                        marker.pose.orientation.x = 0.0
-                        marker.pose.orientation.y = 0.0
-                        marker.pose.orientation.z = 0.0
-                        marker.pose.orientation.w = 1.0
-                        marker.scale.x = 0.1
-                        marker.scale.y = 0.1
-                        marker.scale.z = 0.1
-                        marker.color.r = 0.0
-                        marker.color.g = 0.0
-                        marker.color.b = 1.0
-                        marker.color.a = 0.5
-                        marker.lifetime = rospy.Duration(2,0)
-                        marker.frame_locked = False
-                        self.saliency_rviz_pub.publish(marker)
+                        self.SendSaliencyMarker(self.name,ts,csaliency_id,"/robot/perception/{}".format(self.name),csaliency.direction)
 
             # prune the candidate saliencies and remove them if they disappeared
             to_be_removed = []

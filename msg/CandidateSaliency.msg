@@ -2,5 +2,9 @@ uint32 session_id
 uint32 camera_id
 uint32 csaliency_id
 time ts
-Float32XY position
+Float32XYZ direction
+float32 motion
+float32 umap
+float32 vmap
+float32 contrast
 float32 confidence

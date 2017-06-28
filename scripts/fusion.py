@@ -15,6 +15,14 @@ from threading import Lock
 time_difference = rospy.Time(1,0)
 
 
+class UserLink(object):
+
+    def __init__(self):
+
+        self.camera_id = 0
+        self.cuser_id = 0
+
+
 class Fusion(object):
 
 
@@ -33,6 +41,9 @@ class Fusion(object):
         self.store_thumbs = rospy.get_param("/store_thumbs")
         self.visualization = rospy.get_param("/visualization")
         self.visualize_pipeline = rospy.get_param("/visualize_pipeline")
+
+        self.session_tag = str(rospy.get_param("/session_tag"))
+        self.session_id = hash(self.session_tag) & 0xFFFFFFFF
 
         self.rate = 30.0
 
@@ -98,15 +109,153 @@ class Fusion(object):
             ts = data.current_expected
 
             # prepare established observations
-            users = []
-            hands = []
-            saliencies = []
+            eusers = []
+            ehands = []
+            esaliencies = []
 
-            # put candidate users in user list and fuse if close enough
+            # build user fuse groups
+            usergroups = []
+
+            # iterate over all pipeline pairs without duplications
+            for camera_id1 in self.cusers:
+                for camera_id2 in self.cusers:
+                    if camera_id1 < camera_id2:  # the IDs are numeric hashes based on the unique pipeline name
+
+                        print "camera_id1 {} and camera_id2 {}:".format(camera_id1,camera_id2)
+
+                        # iterate over all combinations of users
+                        for cuser_id1 in self.cusers[camera_id1]:
+                            for cuser_id2 in self.cusers[camera_id2]:
+
+                                print "    cuser_id1 {} and cuser_id2 {}:".format(cuser_id1,cuser_id2)
+
+                                # calculate distance
+                                dx = self.cusers[camera_id1][cuser_id1].position.x - self.cusers[camera_id2][cuser_id2].position.x
+                                dy = self.cusers[camera_id1][cuser_id1].position.y - self.cusers[camera_id2][cuser_id2].position.y
+                                dz = self.cusers[camera_id1][cuser_id1].position.z - self.cusers[camera_id2][cuser_id2].position.z
+                                distance = sqrt(dx * dx + dy * dy + dz * dz)
+
+                                print "        distance {} m".format(distance)
+
+                                # if close enough,
+                                if distance < user_fuse_distance:
+
+                                    # find existing user group that has camera_id1:cuser_id1
+                                    found = -1
+                                    for i in range(0,len(usergroups)):
+                                        for k in range(0,len(usergroups[i])):
+                                            if (usergroups[i][k].camera_id == camera_id1) and (usergroups[i][k].cuser_id == cuser_id1):
+                                                found = i
+                                                break
+                                        if found:
+                                            break
+
+                                    # prepare link
+                                    link2 = UserLink()
+                                    link2.camera_id = camera_id2
+                                    link2.cuser_id = cuser_id2
+
+                                    if found != -1:
+                                        print "            close enough, add link to existing group"
+                                        # add link to existing group
+                                        usergroups[found].append(link2)
+                                    else:
+                                        print "            close enough, create new group for link"
+                                        # create new group with these links
+                                        group = []
+                                        link1 = UserLink()
+                                        link1.camera_id = camera_id1
+                                        link1.cuser_id = cuser_id1
+                                        group.append(link1)
+                                        group.append(link2)
+                                        usergroups.append(group)
+
+            # create established user from each user group
+            for group in usergroups:
+
+                euser = EstablishedUser()
+                euser.session_id = self.session_id
+                euser.ts = ts
+                euser.position.x = 0.0
+                euser.position.y = 0.0
+                euser.position.z = 0.0
+                euser.confidence = 0.0
+                euser.smile = 0.0
+                euser.frown = 0.0
+                euser.expressions = ""
+                euser.age = 0.0
+                euser.age_confidence = 0.0
+                euser.gender = 0
+                euser.gender_confidence = 0.0
+                euser.identity = 0
+                euser.identity_confidence = 0
+
+                print "converting group to established user:"
+
+                n = len(group)
+                for link in group:
+                    print "    camera_id {}, cuser_id {}, position {},{},{}".format(camera_id,cuser_id,self.cusers[link.camera_id][link.cuser_id].position.x,self.cusers[link.camera_id][link.cuser_id].position.y,self.cusers[link.camera_id][link.cuser_id].position.z)
+                    euser.position.x += self.cusers[link.camera_id][link.cuser_id].position.x
+                    euser.position.y += self.cusers[link.camera_id][link.cuser_id].position.y
+                    euser.position.z += self.cusers[link.camera_id][link.cuser_id].position.z
+                    euser.confidence += self.cusers[link.camera_id][link.cuser_id].confidence
+                    euser.smile += self.cusers[link.camera_id][link.cuser_id].smile
+                    euser.frown += self.cusers[link.camera_id][link.cuser_id].frown
+                    euser.expressions += self.cusers[link.camera_id][link.cuser_id].expressions
+                    euser.age += self.cusers[link.camera_id][link.cuser_id].age
+                    euser.age_confidence += self.cusers[link.camera_id][link.cuser_id].age_confidence
+
+                euser.position.x /= n
+                euser.position.y /= n
+                euser.position.z /= n
+                euser.confidence /= n
+                euser.smile /= n
+                euser.frown /= n
+                euser.age /= n
+                euser.age_confidence /= n
+                # TODO: gender is the most likely of any of the group
+                # TODO: identity is the most likely of any of the group
+
+                eusers.append(euser)
+
+            # create established user for all users not referenced in any group
             for camera_id in self.cusers:
                 for cuser_id in self.cusers[camera_id]:
-                    ()
-                    # check existing users and either fuse or add
+
+                    # find user in any link of any group
+                    found = False
+                    for group in usergroups:
+                        for link in group:
+                            if (link.camera_id == camera_id) and (link.cuser_id == cuser_id):
+                                found = True
+                                break
+                        if found:
+                            break
+
+                    # and convert to established user if not found
+                    if not found:
+
+                        print "converting single candidate user to established user:"
+                        print "    camera_id {}, cuser_id {}, position {},{},{}".format(camera_id,cuser_id,self.cusers[camera_id][cuser_id].position.x,self.cusers[camera_id][cuser_id].position.y,self.cusers[camera_id][cuser_id].position.z)
+
+                        euser = EstablishedUser()
+                        euser.session_id = self.session_id
+                        euser.ts = ts
+                        euser.position.x = self.cusers[camera_id][cuser_id].position.x
+                        euser.position.y = self.cusers[camera_id][cuser_id].position.y
+                        euser.position.z = self.cusers[camera_id][cuser_id].position.z
+                        euser.confidence = self.cusers[camera_id][cuser_id].confidence
+                        euser.smile = self.cusers[camera_id][cuser_id].smile
+                        euser.frown = self.cusers[camera_id][cuser_id].frown
+                        euser.expressions = self.cusers[camera_id][cuser_id].expressions
+                        euser.age = self.cusers[camera_id][cuser_id].age
+                        euser.age_confidence = self.cusers[camera_id][cuser_id].age_confidence
+                        euser.gender = self.cusers[camera_id][cuser_id].gender
+                        euser.gender_confidence = self.cusers[camera_id][cuser_id].gender_confidence
+                        euser.identity = self.cusers[camera_id][cuser_id].identity
+                        euser.identity_confidence = self.cusers[camera_id][cuser_id].identity_confidence
+                        eusers.append(euser)
+
 
             # fuse candidate hands between pipelines
             for camera_id in self.chands:
@@ -133,6 +282,8 @@ class Fusion(object):
             # fuse sounds and saliency
 
             # output all established stuff
+            for euser in eusers:
+                self.euser_pub.publish(euser)
 
             # TODO: send markers to RViz
             if self.visualization:
