@@ -3,6 +3,112 @@ TODO:
 * unit vector saliency
 * saliency in rviz
 + fusion results
++ gather parameters
 - transform unit vectors to world coordinates, i.e. normals...
 - RealSense saliency
-- OpenBiometrics ubuntu apt-get package
++ OpenBiometrics ubuntu apt-get package
+
+
+All parameters:
+
+detect_faces_haar:
+
+	debug_face_detect_flag
+	face_height
+	thumb_width
+	thumb_height
+	haar_cascade_filename
+	fovy
+	aspect
+	rotate
+	face_detect_rate
+	face_detect_work_width
+	face_detect_work_height
+	haar_scale_factor
+	haar_min_width
+	haar_min_height
+
+
+detect_hands:
+
+	TBD
+
+
+detect_saliency_ittikoch:
+
+	debug_saliency_flag
+	fovy
+	aspect
+	rotate
+	saliency_detect_rate
+	saliency_detect_work_width
+	saliency_detect_work_height
+	ittikoch_reduced_width
+	ittikoch_reduced_height
+	ittikoch_gaussian_size
+	ittikoch_motion_factor
+	ittikoch_color_factor
+	ittikoch_contrast_factor
+	ittikoch_num_points
+	ittikoch_eraser_radius
+
+detect_sounds_hyst:
+
+	TBD
+
+
+face_analysis_openbr:
+
+	face_analysis_temp_dir
+	thumbs_dir
+
+
+fusion:
+
+	visualize_flag
+	fusion_rate
+	face_fuse_distance
+	hand_fuse_distance
+	saliency_fuse_distance
+	face_saliency_fuse_distance
+	hand_saliency_fuse_distance
+	face_sound_fuse_distance
+	hand_sound_fuse_distance
+	saliency_sound_fuse_distance
+
+gather_pau_states:
+
+hearing_pipeline:
+	store_sounds_flag
+
+realsense_param_proxy:
+
+speech_to_text_google:
+
+vision_pipeline:
+	session_tag
+	debug_vision_flag
+	store_thumbs_flag
+	visualize_flag
+	visualize_candidates_flag
+	thumbs_dir
+	thumbs_ext
+	fovy
+	aspect
+	rotate
+	pipeline_rate
+	face_regression
+	hand_regression
+	saliency_regression
+	face_fuse_distance
+	hand_fuse_distance
+	saliency_fuse_distance
+	min_face_confidence
+	min_hand_confidence
+	min_saliency_confidence
+	face_keep_time
+	hand_keep_time
+	saliency_keep_time
+	full_face_points
+	full_hand_points
+	full_saliency_points

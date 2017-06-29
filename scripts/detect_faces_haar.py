@@ -23,7 +23,7 @@ import cv2
 import math
 import dynamic_reconfigure.client
 from sensor_msgs.msg import Image
-from r2_perception.msg import Face
+from r2_perception.msg import Face,Float32XYZ
 from cv_bridge import CvBridge
 from threading import Lock
 
@@ -42,7 +42,7 @@ def GenerateFaceID():
     return result
 
 
-class DetectFaces(object):
+class DetectFacesHaar(object):
 
 
     # constructor
@@ -51,28 +51,45 @@ class DetectFaces(object):
         # create lock
         self.lock = Lock()
 
+        # start possible debug window
+        cv2.startWindowThread()
+
         # initialize current frame and timestamp
         self.cur_frame = Image()
         self.cur_ts = 0.0
 
-        # get global parameters
-        self.haar_cascade = rospy.get_param("/haar_cascade")
-        self.face_height = rospy.get_param("/face_height")
+        # get pipeline name
+        self.name = rospy.get_namespace().split('/')[-2]
 
-        # get local parameters
+        # get parameters
+        self.debug_face_detect_flag = rospy.get_param("debug_face_detect_flag")
+        if self.debug_face_detect_flag:
+            cv2.namedWindow(self.name + " faces")
+
+        self.face_height = rospy.get_param("face_height")
+
+        self.thumb_width = rospy.get_param("thumb_width")
+        self.thumb_height = rospy.get_param("thumb_height")
+
         self.fovy = rospy.get_param("fovy")
         self.aspect = rospy.get_param("aspect")
         self.rotate = rospy.get_param("rotate")
+
         self.face_detect_rate = rospy.get_param("face_detect_rate")
-
-        # start Haar cascade
-        self.face_cascade = cv2.CascadeClassifier(self.haar_cascade)
-
-        # start timer
         self.timer = rospy.Timer(rospy.Duration(1.0 / self.face_detect_rate),self.HandleTimer)
 
-        # start dynamic reconfigure client
-        #self.dynparam = dynamic_reconfigure.client.Client("vision_pipeline",timeout=30,config_callback=self.HandleConfig)        
+        self.face_detect_work_width = rospy.get_param("face_detect_work_width")
+        self.face_detect_work_height = rospy.get_param("face_detect_work_height")
+
+        self.haar_cascade_filename = rospy.get_param("haar_cascade_filename")
+        self.face_cascade = cv2.CascadeClassifier(self.haar_cascade_filename)
+
+        self.haar_scale_factor = rospy.get_param("haar_scale_factor")
+        self.haar_min_width = rospy.get_param("haar_min_width")
+        self.haar_min_height = rospy.get_param("haar_min_height")
+
+        # start dynamic reconfigure client from vision_pipeline
+        self.dynparam = dynamic_reconfigure.client.Client("vision_pipeline",timeout=30,config_callback=self.HandleConfig)
 
         # start subscriber and publisher
         self.image_sub = rospy.Subscriber("camera/image_raw",Image,self.HandleImage)
@@ -82,15 +99,40 @@ class DetectFaces(object):
     # when a dynamic reconfigure update occurs
     def HandleConfig(self,data):
 
-        # copy parameters from server
+        new_debug_face_detect_flag = rospy.get_param("/debug_face_detect_flag")
+        if new_debug_face_detect_flag != self.debug_face_detect_flag:
+            self.debug_face_detect_flag = new_debug_face_detect_flag
+            if self.debug_face_detect_flag:
+                cv2.namedWindow(self.name + " faces")
+            else:
+                cv2.destroyWindow(self.name + " faces")
+
+        self.face_height = data.face_height
+
+        self.thumb_width = data.thumb_width
+        self.thumb_height = data.thumb_height
+
         self.fovy = data.fovy
         self.aspect = data.aspect
         self.rotate = data.rotate
-        self.face_detect_rate = data.face_detect_rate
 
-        # reset timer
-        self.timer.shutdown()
-        self.timer = rospy.Timer(rospy.Duration(1.0 / self.face_detect_rate),self.HandleTimer)
+        new_face_detect_rate = data.face_detect_rate
+        if new_face_detect_rate != self.face_detect_rate:
+            self.face_detect_rate = new_face_detect_rate
+            self.timer.shutdown()
+            self.timer = rospy.Timer(rospy.Duration(1.0 / self.face_detect_rate),self.HandleTimer)            
+
+        self.face_detect_work_width = data.face_detect_work_width
+        self.face_detect_work_height = data.face_detect_work_height
+
+        new_haar_cascade_filename = data.haar_cascade_filename
+        if new_haar_cascade_filename != self.haar_cascade_filename:
+            self.haar_cascade_file = new_haar_cascade_filename
+            self.face_cascade = cv2.CascadeClassifier(self.haar_cascade_filename)
+
+        self.haar_scale_factor = data.haar_scale_factor
+        self.haar_min_width = data.haar_min_width
+        self.haar_min_height = data.haar_min_height
 
 
     # when a new camera image arrives
@@ -106,89 +148,80 @@ class DetectFaces(object):
     # at face detection rate
     def HandleTimer(self,data):
 
-        rosts = rospy.get_rostime()
-
         with self.lock:
 
             # if no image is available, exit
             if self.cur_ts == 0.0:
                 return
 
-            # convert image from ROS to OpenCV
-            subx = 160
-            suby = 120
+            # calculate distance to camera plane
             cpd = 1.0 / math.tan(self.fovy)
-            color_image = cv2.resize(opencv_bridge.imgmsg_to_cv2(self.cur_image,"bgr8"),(subx,suby),interpolation=cv2.INTER_LINEAR)
 
+            # cache working size (change according to rotation)
+            width = self.face_detect_work_width
+            height = self.face_detect_work_height
+
+            # convert image from ROS to OpenCV, unrotate and rescale
+            image = cv2.resize(opencv_bridge.imgmsg_to_cv2(self.cur_image,"bgr8"),(width,height),interpolation=cv2.INTER_LINEAR)
             if self.rotate == 90:
-                subx = 120
-                suby = 160
+                width = self.face_detect_work_height
+                height = self.face_detect_work_width
                 cpd /= self.aspect
-                color_image = cv2.transpose(color_image)
-
+                image = cv2.transpose(image)
             elif self.rotate == -90:
-                subx = 120
-                suby = 160
+                width = self.face_detect_work_height
+                height = self.face_detect_work_width
                 cpd /= self.aspect
-                color_image = cv2.transpose(color_image)
-                color_image = cv2.flip(color_image,1)
-
+                image = cv2.transpose(image)
+                image = cv2.flip(image,1)
             elif self.rotate == 180:
-                color_image = cv2.flip(color_image,-1)
+                image = cv2.flip(image,1)
+                image = cv2.flip(image,-1)
 
             # detect all faces in the image
-            faces = self.face_cascade.detectMultiScale(color_image,scaleFactor=1.1,minSize=(20,20),flags=cv2.cv.CV_HAAR_SCALE_IMAGE)
-
-            # faces is now a list of (x,y,w,h) tuples, where (x,y) is the center of the face rectangle and (w,h) is the size
+            faces = self.face_cascade.detectMultiScale(image,scaleFactor=self.haar_scale_factor,minSize=(self.haar_min_width,self.haar_min_height),flags=cv2.cv.CV_HAAR_SCALE_IMAGE)
 
             # if there are no faces detected, exit
             if len(faces) == 0:
                 return
 
-            # iterate over all faces
+            # iterate over all found faces
             for (x,y,w,h) in faces:
 
                 # if the face actually doesn't exist, continue with next face
                 if (w <= 0) or (h <= 0):
                     continue
 
-                # calculate distance of the face to the camera (X-coordinate)
-                cx = float(self.face_height) * cpd * float(suby) / float(h)
+                # calculate distance of the face to the camera
+                cx = float(self.face_height) * cpd * float(height) / float(h)
 
                 # convert camera coordinates to normalized coordinates on the camera plane
-                fy = 1.0 - 2.0 * float(x + w / 2) / float(subx)
-                fz = 1.0 - 2.0 * float(y + h / 2) / float(suby)
+                fy = 1.0 - 2.0 * float(x + w / 2) / float(width)
+                fz = 1.0 - 2.0 * float(y + h / 2) / float(height)
 
-                # project to face distance (Y- and Z-coordinates)
+                # project to face distance
                 cy = cx * fy / cpd
                 cz = cx * fz / cpd
 
                 # prepare raw face message
                 msg = Face()
-
                 msg.face_id = GenerateFaceID()
-
                 msg.ts = self.cur_ts
-
                 msg.rect.origin.x = -fy
                 msg.rect.origin.y = -fz
-                msg.rect.size.x = 2.0 * float(w) / float(subx)
-                msg.rect.size.y = 2.0 * float(h) / float(suby)
-
+                msg.rect.size.x = 2.0 * float(w) / float(width)
+                msg.rect.size.y = 2.0 * float(h) / float(height)
                 msg.position.x = cx
                 msg.position.y = cy
                 msg.position.z = cz
-
                 msg.confidence = 1.0
                 msg.smile = 0.0
                 msg.frown = 0.0
-
                 msg.expressions = []
-
                 msg.landmarks = []
 
-                # cut out face thumbnail and resize to 64x64
-                cvthumb = cv2.resize(color_image[y:y+h,x:x+w],(64,64))
+                # cut out face thumbnail and resize
+                cvthumb = cv2.resize(image[y:y+h,x:x+w],(self.thumb_width,self.thumb_height))
 
                 # convert thumbnail from OpenCV to ROS
                 msg.thumb = opencv_bridge.cv2_to_imgmsg(cvthumb,encoding="8UC3")
@@ -196,11 +229,9 @@ class DetectFaces(object):
                 # and publish the raw face
                 self.face_pub.publish(msg)
 
-            print "after detect_faces {}".format(rospy.get_rostime().to_sec())
-
 
 if __name__ == '__main__':
 
     rospy.init_node('detect_faces')
-    node = DetectFaces()
+    node = DetectFacesHaar()
     rospy.spin()

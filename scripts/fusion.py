@@ -11,11 +11,8 @@ from r2_perception.msg import CandidateUser,CandidateHand,CandidateSaliency,Esta
 from threading import Lock
 
 
-# maximum keep time (seconds)
-time_difference = rospy.Time(1,0)
-
-
 class UserLink(object):
+
 
     def __init__(self):
 
@@ -289,7 +286,7 @@ class Fusion(object):
             if self.visualization:
                 ()
 
-            prune_before_time = ts - time_difference
+            prune_before_time = ts - self.face_keep_time
 
             # clean out old users from self.cusers
             for camera_id in self.cusers:
