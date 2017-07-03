@@ -86,7 +86,7 @@ class FaceAnalysisOpenBiometrics(object):
         msg = FaceResponse()
         msg.session_id = data.session_id
         msg.camera_id = data.camera_id
-        msg.cuser_id = data.cuser_id
+        msg.cface_id = data.cface_id
         msg.face_id = data.face_id
         msg.ts = data.ts
         msg.age = age

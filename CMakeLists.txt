@@ -65,12 +65,12 @@ add_message_files(
   RealSenseParam.msg
   FaceRequest.msg
   FaceResponse.msg
-  CandidateUser.msg
+  CandidateFace.msg
   CandidateHand.msg
   CandidateSaliency.msg
   CandidateSound.msg
   CandidateSpeech.msg
-  EstablishedUser.msg
+  EstablishedFace.msg
   EstablishedHand.msg
   EstablishedSaliency.msg
 )
