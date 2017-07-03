@@ -343,7 +343,7 @@ class VisionPipeline(object):
                 dz = data.direction.z - saliency.direction.z
                 d = sqrt(dx * dx + dy * dy + dz * dz)
 
-                # update closest                
+                # update closest
                 if (closest_csaliency_id == 0) or (d < closest_dist):
                     closest_csaliency_id = csaliency_id
                     closest_dist = d
@@ -579,7 +579,7 @@ class VisionPipeline(object):
         marker.frame_locked = False
         self.hand_rviz_pub.publish(marker)
 
-
+        
     # send markers to RViz for a saliency vector
     def SendSaliencyMarker(self,frame_id,ts,csaliency_id,ns,direction):
 
@@ -613,7 +613,7 @@ class VisionPipeline(object):
         marker.frame_locked = False
         self.saliency_rviz_pub.publish(marker)
 
-
+        
     # at vision rate
     def HandleTimer(self,data):
 
@@ -681,6 +681,7 @@ class VisionPipeline(object):
                     to_be_removed.append(cuser_id)
             for key in to_be_removed:
                 del self.cusers[key]
+
 
             # mine the current candidate hands for confident ones and send them off
             for chand_id in self.chands:
