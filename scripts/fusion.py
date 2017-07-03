@@ -13,19 +13,10 @@ from threading import Lock
 
 class FaceLink(object):
 
-
     def __init__(self):
 
         self.camera_id = 0
         self.cface_id = 0
-
-
-class UserLink(object):
-
-    def __init__(self):
-
-        self.camera_id = 0
-        self.cuser_id = 0
 
 
 class Fusion(object):
