@@ -52,7 +52,7 @@ def cv2normalize(image):
     cv2.normalize(cv2.absdiff(image,0.0),dest,0.0,1.0,cv2.NORM_MINMAX)
     return dest
 
-
+  
 class DetectSaliencyIttiKoch(object):
 
 
@@ -234,6 +234,8 @@ class DetectSaliencyIttiKoch(object):
             # add all together
             total = motion_image * self.ittikoch_motion_factor + vmap_image * self.ittikoch_color_factor + umap_image * self.ittikoch_color_factor + contrast_image * self.ittikoch_contrast_factor
 
+            cpd = 1.0 / math.tan(self.fovy)
+
             # find successively brightest points in a much lower resolution result
             reduced = cv2.resize(total,(rwidth,rheight),interpolation=cv2.INTER_LINEAR)
             scratch = reduced.copy()
@@ -281,8 +283,6 @@ class DetectSaliencyIttiKoch(object):
                 msg.vmap = vmap_image[y,x] * self.ittikoch_color_factor
                 msg.contrast = contrast_image[y,x] * self.ittikoch_contrast_factor
                 msg.confidence = 1.0
-
-                # and publish the raw saliency
                 self.saliency_pub.publish(msg)
 
             if self.debug_saliency_detect_flag:

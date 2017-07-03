@@ -20,6 +20,14 @@ class FaceLink(object):
         self.cface_id = 0
 
 
+class UserLink(object):
+
+    def __init__(self):
+
+        self.camera_id = 0
+        self.cuser_id = 0
+
+
 class Fusion(object):
 
 
