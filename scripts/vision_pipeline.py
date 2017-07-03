@@ -12,6 +12,9 @@ import cv2
 import tf
 import math
 import geometry_msgs
+from user_predictor import UserPredictor
+from hand_predictor import HandPredictor
+from saliency_predictor import SaliencyPredictor
 from dynamic_reconfigure.server import Server
 from r2_perception.cfg import vision_pipelineConfig as VisionConfig
 from sensor_msgs.msg import Image
@@ -24,24 +27,6 @@ from geometry_msgs.msg import Point,PointStamped
 
 
 opencv_bridge = CvBridge()
-
-# maximum fuse distance between faces (meters)
-face_continuity_threshold_m = 0.5
-
-# maximum fuse distance between hands (meters)
-hand_continuity_threshold_m = 0.5
-
-# maximum fuse distance between salient points (meters)
-saliency_continuity_threshold_m = 0.3
-
-# minimum confidence needed for an observation to be valid (0..1)
-minimum_confidence = 0.4
-
-# maximum extrapolation time (seconds)
-time_difference = rospy.Time(1,0)
-
-# number of points needed for full confidence
-full_points = 5
 
 
 serial_number = 0
@@ -86,38 +71,39 @@ class VisionPipeline(object):
         self.name = rospy.get_namespace().split('/')[-2]
         self.camera_id = hash(self.name) & 0xFFFFFFFF
 
-        # get parameters
+        # get fixed parameters
         self.session_tag = str(rospy.get_param("/session_tag"))
         self.session_id = hash(self.session_tag) & 0xFFFFFFFF
 
+        self.thumbs_dir = rospy.get_param("/thumbs_dir")
+        self.thumbs_ext = rospy.get_param("/thumbs_ext")
+        self.store_thumbs_flag = rospy.get_param("/store_thumbs_flag")
+        if self.store_thumbs_flag:
+            camera_dir = self.name + "_%08X" % (self.camera_id & 0xFFFFFFFF)
+            self.thumbs_output_dir = self.thumbs_dir + "/" + self.session_tag + "_%08X/" & (self.session_id & 0xFFFFFFFF) + camera_tag + "/"
+            if not os.path.exists(self.thumbs_output_dir):
+                os.makedirs(self.thumbs_output_dir)
+
+        self.visualize_flag = rospy.get_param("/visualize_flag")
+
+        # get dynamic parameters
         self.debug_vision_flag = rospy.get_param("debug_vision_flag")
         if self.debug_vision_flag:
             cv2.namedWindow(self.name)
             self.frame_sub = rospy.Subscriber("camera/image_raw",Image,self.HandleFrame)
 
-        self.visualize_flag = rospy.get_param("visualize_flag")
         self.visualize_candidates_flag = rospy.get_param("visualize_candidates_flag")
-        if self.visualization_flag and self.visualize_candidates_flag:
+        if self.visualize_flag and self.visualize_candidates_flag:
             self.face_rviz_pub = rospy.Publisher("rviz_face",Marker,queue_size=5)
             self.hand_rviz_pub = rospy.Publisher("rviz_hand",Marker,queue_size=5)
             self.saliency_rviz_pub = rospy.Publisher("rviz_saliency",Marker,queue_size=5)
-
-        self.thumbs_dir = rospy.get_param("thumbs_dir")
-        self.thumbs_ext = rospy.get_param("thumbs_ext")
-        self.store_thumbs_flag = rospy.get_param("store_thumbs_flag")
-        if self.store_thumbs_flag:
-            today_dir = time.strftime("%Y%m%d")
-            camera_dir = self.name + "_%08X" % (self.camera_id & 0xFFFFFFFF)
-            self.thumbs_output_dir = self.thumbs_dir + "/" + today_dir + "/" + self.session_tag + "_%08X/" & (self.session_id & 0xFFFFFFFF) + camera_tag + "/"
-            if not os.path.exists(self.thumbs_output_dir):
-                os.makedirs(self.thumbs_output_dir)
 
         self.fovy = rospy.get_param("fovy")
         self.aspect = rospy.get_param("aspect")
         self.rotate = rospy.get_param("rotate")
 
-        self.vision_rate = rospy.get_param("vision_rate")
-        self.timer = rospy.Timer(rospy.Duration(1.0 / self.vision_rate),self.HandleTimer)
+        self.pipeline_rate = rospy.get_param("pipeline_rate")
+        self.timer = rospy.Timer(rospy.Duration(1.0 / self.pipeline_rate),self.HandleTimer)
 
         self.face_regression_flag = rospy.get_param("face_regression_flag")
         self.hand_regression_flag = rospy.get_param("hand_regression_flag")
@@ -131,11 +117,11 @@ class VisionPipeline(object):
         self.min_hand_confidence = rospy.get_param("min_hand_confidence")
         self.min_saliency_confidence = rospy.get_param("min_saliency_confidence")
 
-        self.face_keep_time = rospy.get_param("face_keep_time")
+        self.user_keep_time = rospy.get_param("user_keep_time")
         self.hand_keep_time = rospy.get_param("hand_keep_time")
         self.saliency_keep_time = rospy.get_param("saliency_keep_time")
 
-        self.full_face_points = rospy.get_param("full_face_points")
+        self.full_user_points = rospy.get_param("full_user_points")
         self.full_hand_points = rospy.get_param("full_hand_points")
         self.full_saliency_points = rospy.get_param("full_saliency_points")
 
@@ -160,11 +146,6 @@ class VisionPipeline(object):
 
     def HandleConfig(self,data,level):
 
-        new_session_tag = data.session_tag
-        if new_session_tag != self.session_tag:
-        self.session_tag = new_session_tag
-            self.session_id = hash(self.session_tag) & 0xFFFFFFFF
-
         new_debug_vision_flag = data.debug_vision_flag
         if new_debug_vision_flag != self.debug_vision_flag:
             self.debug_vision_flag = new_debug_vision_flag
@@ -175,10 +156,8 @@ class VisionPipeline(object):
                 cv2.destroyWindow(self.name)
                 self.frame_sub.unregister()
 
-        new_visualize_flag = data.visualize_flag
         new_visualize_candidates_flag = data.visualize_candidates_flag
-        if (new_visualize_flag != self.visualize_flag) or (new_visualize_candidates_flag != self.visualize_candidates_flag):
-            self.visualize_flag = new_visualize_flag
+        if new_visualize_candidates_flag != self.visualize_candidates_flag:
             self.visualize_candidates_flag = new_visualize_candidates_flag
             if self.visualization_flag and self.visualize_candidates_flag:
                 self.face_rviz_pub = rospy.Publisher("rviz_face",Marker,queue_size=5)
@@ -189,28 +168,15 @@ class VisionPipeline(object):
                 self.hand_rviz_pub.unregister()
                 self.saliency_rviz_pub.unregister()
 
-        new_thumbs_dir = data.thumbs_dir
-        self.thumbs_ext = data.thumbs_ext
-        new_store_thumbs_flag = data.store_thumbs_flag
-        if (new_thumbs_dir != self.thumbs_dir) or (new_store_thumbs_flag != self.store_thumbs_flag):
-            self.thumbs_dir = new_thumbs_dir
-            self.store_thumbs_flag = new_store_thumbs_flag
-            if self.store_thumbs_flag:
-                today_dir = time.strftime("%Y%m%d")
-                camera_dir = self.name + "_%08X" % (self.camera_id & 0xFFFFFFFF)
-                self.thumbs_output_dir = self.thumbs_dir + "/" + today_dir + "/" + self.session_tag + "_%08X/" & (self.session_id & 0xFFFFFFFF) + camera_tag + "/"
-                if not os.path.exists(self.thumbs_output_dir):
-                    os.makedirs(self.thumbs_output_dir)
-
         self.fovy = data.fovy
         self.aspect = data.aspect
         self.rotate = data.rotate
 
-        new_vision_rate = data.vision_rate
-        if new_vision_rate != self.vision_rate:
-            self.vision_rate = new_vision_rate
+        new_pipeline_rate = data.pipeline_rate
+        if new_pipeline_rate != self.pipeline_rate:
+            self.pipeline_rate = new_pipeline_rate
             self.timer.shutdown()
-            self.timer = rospy.Timer(rospy.Duration(1.0 / self.vision_rate),self.HandleTimer)
+            self.timer = rospy.Timer(rospy.Duration(1.0 / self.pipeline_rate),self.HandleTimer)
 
         self.face_regression_flag = data.face_regression_flag
         self.hand_regression_flag = data.hand_regression_flag
@@ -224,11 +190,11 @@ class VisionPipeline(object):
         self.min_hand_confidence = data.min_hand_confidence
         self.min_saliency_confidence = data.min_saliency_confidence
 
-        self.face_keep_time = data.face_keep_time
+        self.user_keep_time = data.user_keep_time
         self.hand_keep_time = data.hand_keep_time
         self.saliency_keep_time = data.saliency_keep_time
 
-        self.full_face_points = data.full_face_points
+        self.full_user_points = data.full_user_points
         self.full_hand_points = data.full_hand_points
         self.full_saliency_points = data.full_saliency_points
 
@@ -383,7 +349,7 @@ class VisionPipeline(object):
                     closest_dist = d
 
             # if close enough to existing saliency vector
-            if closest_dist < self.saliency_fuse_distance
+            if closest_dist < self.saliency_fuse_distance:
 
                 # fuse with existing candidate saliency vector
                 self.csaliencies[closest_csaliency_id].Append(data)
@@ -703,12 +669,12 @@ class VisionPipeline(object):
                         self.cuser_pub.publish(msg)
 
                     # output markers to rviz
-                    if self.visualization_flag and self.visualize_candidates_flag:
+                    if self.visualize_flag and self.visualize_candidates_flag:
                         self.SendUserMarkers(self.name,ts,cuser_id,"/robot/perception/{}".format(self.name),cuser.position)
 
             # prune the candidate users and remove them if they disappeared
             to_be_removed = []
-            prune_before_time = ts - self.face_keep_time
+            prune_before_time = ts - rospy.Duration.from_sec(self.user_keep_time)
             for cuser_id in self.cusers:
                 self.cusers[cuser_id].PruneBefore(prune_before_time)
                 if len(self.cusers[cuser_id].faces) == 0:
@@ -754,12 +720,12 @@ class VisionPipeline(object):
                         self.chand_pub.publish(msg)
 
                     # output markers to rviz
-                    if self.visualization_flag and self.visualize_candidates_flag:
+                    if self.visualize_flag and self.visualize_candidates_flag:
                         self.SendHandMarkers(self.name,ts,chand_id,"/robot/perception/{}".format(self.name),chand.position,chand.gestures)
 
             # prune the candidate hands and remove them if they disappeared
             to_be_removed = []
-            prune_before_time = ts - self.hand_keep_time
+            prune_before_time = ts - rospy.Duration.from_sec(self.hand_keep_time)
             for chand_id in self.chands:
                 self.chands[chand_id].PruneBefore(prune_before_time)
                 if len(self.chands[chand_id].hands) == 0:
@@ -789,12 +755,12 @@ class VisionPipeline(object):
                     self.csaliency_pub.publish(msg)
 
                     # output markers to rviz
-                    if self.visualization_flag and self.visualize_candidates_flag:
+                    if self.visualize_flag and self.visualize_candidates_flag:
                         self.SendSaliencyMarker(self.name,ts,csaliency_id,"/robot/perception/{}".format(self.name),csaliency.direction)
 
             # prune the candidate saliencies and remove them if they disappeared
             to_be_removed = []
-            prune_before_time = ts - self.saliency_keep_time
+            prune_before_time = ts - rospy.Duration.from_sec(self.saliency_keep_time)
             for csaliency_id in self.csaliencies:
                 self.csaliencies[csaliency_id].PruneBefore(prune_before_time)
                 if len(self.csaliencies[csaliency_id].saliencies) == 0:

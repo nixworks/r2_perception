@@ -8,7 +8,7 @@ import rospy
 import time
 import cv2
 import csv
-
+import dynamic_reconfigure.client
 from sensor_msgs.msg import Image
 from r2_perception.msg import FaceRequest,FaceResponse
 from cv_bridge import CvBridge
@@ -24,11 +24,11 @@ class FaceAnalysisOpenBiometrics(object):
     # constructor
     def __init__(self):
 
-        # get parameters
-        self.face_analysis_temp_dir = rospy.get_param("face_analysis_temp_dir")
+        # get fixed parameters
+        self.face_analysis_temp_dir = rospy.get_param("/face_analysis_temp_dir")
         if not os.path.exists(self.face_analysis_temp_dir):
             os.makedirs(self.face_analysis_temp_dir)
-        self.thumbs_ext = rospy.get_param("thumbs_ext")
+        self.thumbs_ext = rospy.get_param("/thumbs_ext")
 
         # start dynamic reconfigure client from vision_pipeline
         self.dynparam = dynamic_reconfigure.client.Client("vision_pipeline",timeout=30,config_callback=self.HandleConfig)
@@ -40,15 +40,10 @@ class FaceAnalysisOpenBiometrics(object):
 
     # when a dynamic reconfigure update occurs
     def HandleConfig(self,data):
-
-        new_face_analysis_temp_dir = data.face_analysis_temp_dir
-        if new_face_analysis_temp_dir != self.face_analysis_temp_dir:
-            self.face_analysis_temp_dir = new_face_analysis_temp_dir
-            if not os.path.exists(self.face_analysis_temp_dir):
-                os.makedirs(self.face_analysis_temp_dir)
-        self.thumbs_ext = data.thumbs_ext
+        ()
 
 
+    # when a face request comes in
     def HandleFaceRequest(self,data):
 
         # create filename for face image

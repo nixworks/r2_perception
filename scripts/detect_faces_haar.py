@@ -61,15 +61,19 @@ class DetectFacesHaar(object):
         # get pipeline name
         self.name = rospy.get_namespace().split('/')[-2]
 
-        # get parameters
+        # get fixed parameters
+        self.thumb_width = rospy.get_param("/thumb_width")
+        self.thumb_height = rospy.get_param("/thumb_height")
+
+        self.haar_cascade_filename = rospy.get_param("/haar_cascade_filename")
+        self.face_cascade = cv2.CascadeClassifier(self.haar_cascade_filename)
+
+        # get dynamic parameters
         self.debug_face_detect_flag = rospy.get_param("debug_face_detect_flag")
         if self.debug_face_detect_flag:
             cv2.namedWindow(self.name + " faces")
 
         self.face_height = rospy.get_param("face_height")
-
-        self.thumb_width = rospy.get_param("thumb_width")
-        self.thumb_height = rospy.get_param("thumb_height")
 
         self.fovy = rospy.get_param("fovy")
         self.aspect = rospy.get_param("aspect")
@@ -80,9 +84,6 @@ class DetectFacesHaar(object):
 
         self.face_detect_work_width = rospy.get_param("face_detect_work_width")
         self.face_detect_work_height = rospy.get_param("face_detect_work_height")
-
-        self.haar_cascade_filename = rospy.get_param("haar_cascade_filename")
-        self.face_cascade = cv2.CascadeClassifier(self.haar_cascade_filename)
 
         self.haar_scale_factor = rospy.get_param("haar_scale_factor")
         self.haar_min_width = rospy.get_param("haar_min_width")
@@ -99,7 +100,7 @@ class DetectFacesHaar(object):
     # when a dynamic reconfigure update occurs
     def HandleConfig(self,data):
 
-        new_debug_face_detect_flag = rospy.get_param("/debug_face_detect_flag")
+        new_debug_face_detect_flag = data.debug_face_detect_flag
         if new_debug_face_detect_flag != self.debug_face_detect_flag:
             self.debug_face_detect_flag = new_debug_face_detect_flag
             if self.debug_face_detect_flag:
@@ -108,9 +109,6 @@ class DetectFacesHaar(object):
                 cv2.destroyWindow(self.name + " faces")
 
         self.face_height = data.face_height
-
-        self.thumb_width = data.thumb_width
-        self.thumb_height = data.thumb_height
 
         self.fovy = data.fovy
         self.aspect = data.aspect
@@ -124,11 +122,6 @@ class DetectFacesHaar(object):
 
         self.face_detect_work_width = data.face_detect_work_width
         self.face_detect_work_height = data.face_detect_work_height
-
-        new_haar_cascade_filename = data.haar_cascade_filename
-        if new_haar_cascade_filename != self.haar_cascade_filename:
-            self.haar_cascade_file = new_haar_cascade_filename
-            self.face_cascade = cv2.CascadeClassifier(self.haar_cascade_filename)
 
         self.haar_scale_factor = data.haar_scale_factor
         self.haar_min_width = data.haar_min_width

@@ -108,7 +108,7 @@ class DetectSaliencyIttiKoch(object):
 
     def HandleConfig(self,data):
 
-        new_debug_saliency_detect_flag = rospy.get_param("/debug_saliency_detect_flag")
+        new_debug_saliency_detect_flag = data.debug_saliency_detect_flag
         if new_debug_saliency_detect_flag != self.debug_saliency_detect_flag:
             self.debug_saliency_detect_flag = new_debug_saliency_detect_flag
             if self.debug_saliency_detect_flag:
@@ -167,8 +167,8 @@ class DetectSaliencyIttiKoch(object):
             # cache feature map size (change according to rotation)
             wwidth = self.saliency_detect_work_width
             wheight = self.saliency_detect_work_height
-            rwidth = self.ittikoch_reduce_width
-            rheight = self.ittikoch_reduce_height
+            rwidth = self.ittikoch_reduced_width
+            rheight = self.ittikoch_reduced_height
 
             # convert images from ROS to OpenCV, unrotate and rescale
             bgr_cur_image = cv2.resize(opencv_bridge.imgmsg_to_cv2(self.cur_image),(wwidth,wheight),interpolation=cv2.INTER_LINEAR)
@@ -176,16 +176,16 @@ class DetectSaliencyIttiKoch(object):
             if self.rotate == 90:
                 wwidth = self.saliency_detect_work_height
                 wheight = self.saliency_detect_work_width
-                rwidth = self.ittikoch_reduce_height
-                rheight = self.ittikoch_reduce_width
+                rwidth = self.ittikoch_reduced_height
+                rheight = self.ittikoch_reduced_width
                 cpd /= self.aspect
                 bgr_cur_image = cv2.transpose(bgr_cur_image)
                 bgr_last_image = cv2.transpose(bgr_last_image)
             elif self.rotate == -90:
                 wwidth = self.saliency_detect_work_height
                 wheight = self.saliency_detect_work_width
-                rwidth = self.ittikoch_reduce_height
-                rheight = self.ittikoch_reduce_width
+                rwidth = self.ittikoch_reduced_height
+                rheight = self.ittikoch_reduced_width
                 cpd /= self.aspect
                 bgr_cur_image = cv2.transpose(bgr_cur_image)
                 bgr_cur_image = cv2.flip(bgr_cur_image,1)
@@ -232,11 +232,7 @@ class DetectSaliencyIttiKoch(object):
             contrast_image = cv2normalize(cv2.Laplacian(y_image - y_lowpass_image,-1))
 
             # add all together
-            total =
-                motion_image * self.ittikoch_motion_factor +
-                vmap_image * self.ittikoch_color_factor +
-                umap_image * self.ittikoch_color_factor +
-                contrast_image * self.ittikoch_contrast_factor
+            total = motion_image * self.ittikoch_motion_factor + vmap_image * self.ittikoch_color_factor + umap_image * self.ittikoch_color_factor + contrast_image * self.ittikoch_contrast_factor
 
             # find successively brightest points in a much lower resolution result
             reduced = cv2.resize(total,(rwidth,rheight),interpolation=cv2.INTER_LINEAR)
@@ -280,10 +276,10 @@ class DetectSaliencyIttiKoch(object):
                 msg.direction.x = fx
                 msg.direction.y = fy
                 msg.direction.z = fz
-                msg.motion = motion[y,x] * motion_factor
-                msg.umap = umap[y,x] * color_factor
-                msg.vmap = vmap[y,x] * color_factor
-                msg.contrast = contrast[y,x] * contrast_factor
+                msg.motion = motion_image[y,x] * self.ittikoch_motion_factor
+                msg.umap = umap_image[y,x] * self.ittikoch_color_factor
+                msg.vmap = vmap_image[y,x] * self.ittikoch_color_factor
+                msg.contrast = contrast_image[y,x] * self.ittikoch_contrast_factor
                 msg.confidence = 1.0
 
                 # and publish the raw saliency
