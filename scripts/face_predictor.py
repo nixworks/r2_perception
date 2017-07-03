@@ -14,7 +14,7 @@ from math import sqrt
 from r2_perception.msg import Face,Hand,Saliency
 
 
-class UserPredictor(object):
+class FacePredictor(object):
 
 
     def __init__(self):

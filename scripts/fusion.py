@@ -7,17 +7,17 @@ from __future__ import with_statement
 import os
 import rospy
 import time
-from r2_perception.msg import CandidateUser,CandidateHand,CandidateSaliency,EstablishedUser,EstablishedHand,EstablishedSaliency
+from r2_perception.msg import CandidateFace,CandidateHand,CandidateSaliency,EstablishedFace,EstablishedHand,EstablishedSaliency
 from threading import Lock
 
 
-class UserLink(object):
+class FaceLink(object):
 
 
     def __init__(self):
 
         self.camera_id = 0
-        self.cuser_id = 0
+        self.cface_id = 0
 
 
 class Fusion(object):
@@ -26,7 +26,7 @@ class Fusion(object):
     def __init__(self):
 
         # prepare observations
-        self.cusers = {}
+        self.cfaces = {}
         self.chands = {}
         self.csaliencies = {}
 
@@ -45,11 +45,11 @@ class Fusion(object):
         self.fusion_rate = rospy.get_param("fusion_rate")
         self.timer = rospy.Timer(rospy.Duration(1.0 / self.fusion_rate),self.HandleTimer)
 
-        self.cuser_subs = []
-        self.cuser_subs.append(rospy.Subscriber("lefteye/cuser",CandidateUser,self.HandleCandidateUser))
-        self.cuser_subs.append(rospy.Subscriber("righteye/cuser",CandidateUser,self.HandleCandidateUser))
-        self.cuser_subs.append(rospy.Subscriber("realsense/cuser",CandidateUser,self.HandleCandidateUser))
-        self.cuser_subs.append(rospy.Subscriber("wideangle/cuser",CandidateUser,self.HandleCandidateUser))
+        self.cface_subs = []
+        self.cface_subs.append(rospy.Subscriber("lefteye/cface",CandidateFace,self.HandleCandidateFace))
+        self.cface_subs.append(rospy.Subscriber("righteye/cface",CandidateFace,self.HandleCandidateFace))
+        self.cface_subs.append(rospy.Subscriber("realsense/cface",CandidateFace,self.HandleCandidateFace))
+        self.cface_subs.append(rospy.Subscriber("wideangle/cface",CandidateFace,self.HandleCandidateFace))
 
         self.chand_subs = []
         self.chand_subs.append(rospy.Subscriber("lefteye/chand",CandidateHand,self.HandleCandidateHand))
@@ -63,19 +63,19 @@ class Fusion(object):
         self.csaliency_subs.append(rospy.Subscriber("realsense/csaliency",CandidateSaliency,self.HandleCandidateSaliency))
         self.csaliency_subs.append(rospy.Subscriber("wideangle/csaliency",CandidateSaliency,self.HandleCandidateSaliency))
 
-        self.euser_pub = rospy.Publisher("user",EstablishedUser,queue_size=5)
+        self.eface_pub = rospy.Publisher("face",EstablishedFace,queue_size=5)
         self.ehand_pub = rospy.Publisher("hand",EstablishedHand,queue_size=5)
         self.esaliency_pub = rospy.Publisher("saliency",EstablishedSaliency,queue_size=5)
 
 
-    def HandleCandidateUser(self,data):
+    def HandleCandidateFace(self,data):
 
         with self.lock:
 
-            # for now, just take the most recent candidate user
-            if data.camera_id not in self.cusers:
-                self.cusers[data.camera_id] = {}
-            self.cusers[data.camera_id][data.cuser_id] = data
+            # for now, just take the most recent candidate face
+            if data.camera_id not in self.cfaces:
+                self.cfaces[data.camera_id] = {}
+            self.cfaces[data.camera_id][data.cface_id] = data
 
 
     def HandleCandidateHand(self,data):
@@ -105,152 +105,152 @@ class Fusion(object):
             ts = data.current_expected
 
             # prepare established observations
-            eusers = []
+            efaces = []
             ehands = []
             esaliencies = []
 
-            # build user fuse groups
-            usergroups = []
+            # build face fuse groups
+            facegroups = []
 
             # iterate over all pipeline pairs without duplications
-            for camera_id1 in self.cusers:
-                for camera_id2 in self.cusers:
+            for camera_id1 in self.faces:
+                for camera_id2 in self.cfaces:
                     if camera_id1 < camera_id2:  # the IDs are numeric hashes based on the unique pipeline name
 
                         print "camera_id1 {} and camera_id2 {}:".format(camera_id1,camera_id2)
 
-                        # iterate over all combinations of users
-                        for cuser_id1 in self.cusers[camera_id1]:
-                            for cuser_id2 in self.cusers[camera_id2]:
+                        # iterate over all combinations of faces
+                        for cface_id1 in self.cfaces[camera_id1]:
+                            for cface_id2 in self.cfaces[camera_id2]:
 
-                                print "    cuser_id1 {} and cuser_id2 {}:".format(cuser_id1,cuser_id2)
+                                print "    cface_id1 {} and cface_id2 {}:".format(cface_id1,cface_id2)
 
                                 # calculate distance
-                                dx = self.cusers[camera_id1][cuser_id1].position.x - self.cusers[camera_id2][cuser_id2].position.x
-                                dy = self.cusers[camera_id1][cuser_id1].position.y - self.cusers[camera_id2][cuser_id2].position.y
-                                dz = self.cusers[camera_id1][cuser_id1].position.z - self.cusers[camera_id2][cuser_id2].position.z
+                                dx = self.cfaces[camera_id1][cface_id1].position.x - self.cfaces[camera_id2][cface_id2].position.x
+                                dy = self.cfaces[camera_id1][cface_id1].position.y - self.cfaces[camera_id2][cface_id2].position.y
+                                dz = self.cfaces[camera_id1][cface_id1].position.z - self.cfaces[camera_id2][cface_id2].position.z
                                 distance = sqrt(dx * dx + dy * dy + dz * dz)
 
                                 print "        distance {} m".format(distance)
 
                                 # if close enough,
-                                if distance < user_fuse_distance:
+                                if distance < face_fuse_distance:
 
-                                    # find existing user group that has camera_id1:cuser_id1
+                                    # find existing face group that has camera_id1:face_id1
                                     found = -1
-                                    for i in range(0,len(usergroups)):
-                                        for k in range(0,len(usergroups[i])):
-                                            if (usergroups[i][k].camera_id == camera_id1) and (usergroups[i][k].cuser_id == cuser_id1):
+                                    for i in range(0,len(facegroups)):
+                                        for k in range(0,len(facegroups[i])):
+                                            if (facegroups[i][k].camera_id == camera_id1) and (facegroups[i][k].cface_id == cface_id1):
                                                 found = i
                                                 break
                                         if found:
                                             break
 
                                     # prepare link
-                                    link2 = UserLink()
+                                    link2 = FaceLink()
                                     link2.camera_id = camera_id2
-                                    link2.cuser_id = cuser_id2
+                                    link2.cface_id = cface_id2
 
                                     if found != -1:
                                         print "            close enough, add link to existing group"
                                         # add link to existing group
-                                        usergroups[found].append(link2)
+                                        facegroups[found].append(link2)
                                     else:
                                         print "            close enough, create new group for link"
                                         # create new group with these links
                                         group = []
-                                        link1 = UserLink()
+                                        link1 = FaceLink()
                                         link1.camera_id = camera_id1
-                                        link1.cuser_id = cuser_id1
+                                        link1.cface_id = cface_id1
                                         group.append(link1)
                                         group.append(link2)
-                                        usergroups.append(group)
+                                        facegroups.append(group)
 
-            # create established user from each user group
-            for group in usergroups:
+            # create established face from each face group
+            for group in facegroups:
 
-                euser = EstablishedUser()
-                euser.session_id = self.session_id
-                euser.ts = ts
-                euser.position.x = 0.0
-                euser.position.y = 0.0
-                euser.position.z = 0.0
-                euser.confidence = 0.0
-                euser.smile = 0.0
-                euser.frown = 0.0
-                euser.expressions = ""
-                euser.age = 0.0
-                euser.age_confidence = 0.0
-                euser.gender = 0
-                euser.gender_confidence = 0.0
-                euser.identity = 0
-                euser.identity_confidence = 0
+                eface = EstablishedFace()
+                eface.session_id = self.session_id
+                eface.ts = ts
+                eface.position.x = 0.0
+                eface.position.y = 0.0
+                eface.position.z = 0.0
+                eface.confidence = 0.0
+                eface.smile = 0.0
+                eface.frown = 0.0
+                eface.expressions = ""
+                eface.age = 0.0
+                eface.age_confidence = 0.0
+                eface.gender = 0
+                eface.gender_confidence = 0.0
+                eface.identity = 0
+                eface.identity_confidence = 0
 
-                print "converting group to established user:"
+                print "converting group to established face:"
 
                 n = len(group)
                 for link in group:
-                    print "    camera_id {}, cuser_id {}, position {},{},{}".format(camera_id,cuser_id,self.cusers[link.camera_id][link.cuser_id].position.x,self.cusers[link.camera_id][link.cuser_id].position.y,self.cusers[link.camera_id][link.cuser_id].position.z)
-                    euser.position.x += self.cusers[link.camera_id][link.cuser_id].position.x
-                    euser.position.y += self.cusers[link.camera_id][link.cuser_id].position.y
-                    euser.position.z += self.cusers[link.camera_id][link.cuser_id].position.z
-                    euser.confidence += self.cusers[link.camera_id][link.cuser_id].confidence
-                    euser.smile += self.cusers[link.camera_id][link.cuser_id].smile
-                    euser.frown += self.cusers[link.camera_id][link.cuser_id].frown
-                    euser.expressions += self.cusers[link.camera_id][link.cuser_id].expressions
-                    euser.age += self.cusers[link.camera_id][link.cuser_id].age
-                    euser.age_confidence += self.cusers[link.camera_id][link.cuser_id].age_confidence
+                    print "    camera_id {}, cface_id {}, position {},{},{}".format(camera_id,cface_id,self.cfaces[link.camera_id][link.cface_id].position.x,self.cfaces[link.camera_id][link.cface_id].position.y,self.cfaces[link.camera_id][link.cface_id].position.z)
+                    eface.position.x += self.cfaces[link.camera_id][link.cface_id].position.x
+                    eface.position.y += self.cfaces[link.camera_id][link.cface_id].position.y
+                    eface.position.z += self.cfaces[link.camera_id][link.cface_id].position.z
+                    eface.confidence += self.cfaces[link.camera_id][link.cface_id].confidence
+                    eface.smile += self.cfaces[link.camera_id][link.cface_id].smile
+                    eface.frown += self.cfaces[link.camera_id][link.cface_id].frown
+                    eface.expressions += self.cfaces[link.camera_id][link.cface_id].expressions
+                    eface.age += self.cfaces[link.camera_id][link.cface_id].age
+                    eface.age_confidence += self.cfaces[link.camera_id][link.cface_id].age_confidence
 
-                euser.position.x /= n
-                euser.position.y /= n
-                euser.position.z /= n
-                euser.confidence /= n
-                euser.smile /= n
-                euser.frown /= n
-                euser.age /= n
-                euser.age_confidence /= n
+                eface.position.x /= n
+                eface.position.y /= n
+                eface.position.z /= n
+                eface.confidence /= n
+                eface.smile /= n
+                eface.frown /= n
+                eface.age /= n
+                eface.age_confidence /= n
                 # TODO: gender is the most likely of any of the group
                 # TODO: identity is the most likely of any of the group
 
-                eusers.append(euser)
+                efaces.append(eface)
 
-            # create established user for all users not referenced in any group
-            for camera_id in self.cusers:
-                for cuser_id in self.cusers[camera_id]:
+            # create established face for all faces not referenced in any group
+            for camera_id in self.cfaces:
+                for cface_id in self.cfaces[camera_id]:
 
-                    # find user in any link of any group
+                    # find face in any link of any group
                     found = False
-                    for group in usergroups:
+                    for group in facegroups:
                         for link in group:
-                            if (link.camera_id == camera_id) and (link.cuser_id == cuser_id):
+                            if (link.camera_id == camera_id) and (link.cface_id == cface_id):
                                 found = True
                                 break
                         if found:
                             break
 
-                    # and convert to established user if not found
+                    # and convert to established face if not found
                     if not found:
 
-                        print "converting single candidate user to established user:"
-                        print "    camera_id {}, cuser_id {}, position {},{},{}".format(camera_id,cuser_id,self.cusers[camera_id][cuser_id].position.x,self.cusers[camera_id][cuser_id].position.y,self.cusers[camera_id][cuser_id].position.z)
+                        print "converting single candidate face to established face:"
+                        print "    camera_id {}, cface_id {}, position {},{},{}".format(camera_id,cface_id,self.cfaces[camera_id][cface_id].position.x,self.cfaces[camera_id][cface_id].position.y,self.cfaces[camera_id][cface_id].position.z)
 
-                        euser = EstablishedUser()
-                        euser.session_id = self.session_id
-                        euser.ts = ts
-                        euser.position.x = self.cusers[camera_id][cuser_id].position.x
-                        euser.position.y = self.cusers[camera_id][cuser_id].position.y
-                        euser.position.z = self.cusers[camera_id][cuser_id].position.z
-                        euser.confidence = self.cusers[camera_id][cuser_id].confidence
-                        euser.smile = self.cusers[camera_id][cuser_id].smile
-                        euser.frown = self.cusers[camera_id][cuser_id].frown
-                        euser.expressions = self.cusers[camera_id][cuser_id].expressions
-                        euser.age = self.cusers[camera_id][cuser_id].age
-                        euser.age_confidence = self.cusers[camera_id][cuser_id].age_confidence
-                        euser.gender = self.cusers[camera_id][cuser_id].gender
-                        euser.gender_confidence = self.cusers[camera_id][cuser_id].gender_confidence
-                        euser.identity = self.cusers[camera_id][cuser_id].identity
-                        euser.identity_confidence = self.cusers[camera_id][cuser_id].identity_confidence
-                        eusers.append(euser)
+                        eface = EstablishedFace()
+                        eface.session_id = self.session_id
+                        eface.ts = ts
+                        eface.position.x = self.cfaces[camera_id][cface_id].position.x
+                        eface.position.y = self.cfaces[camera_id][cface_id].position.y
+                        eface.position.z = self.cfaces[camera_id][cface_id].position.z
+                        eface.confidence = self.cfaces[camera_id][cface_id].confidence
+                        eface.smile = self.cfaces[camera_id][cface_id].smile
+                        eface.frown = self.cfaces[camera_id][cface_id].frown
+                        eface.expressions = self.cfaces[camera_id][cface_id].expressions
+                        eface.age = self.cfaces[camera_id][cface_id].age
+                        eface.age_confidence = self.cfaces[camera_id][cface_id].age_confidence
+                        eface.gender = self.cfaces[camera_id][cface_id].gender
+                        eface.gender_confidence = self.cfaces[camera_id][cface_id].gender_confidence
+                        eface.identity = self.cfaces[camera_id][cface_id].identity
+                        eface.identity_confidence = self.cfaces[camera_id][cface_id].identity_confidence
+                        efaces.append(eface)
 
 
             # fuse candidate hands between pipelines
@@ -278,20 +278,20 @@ class Fusion(object):
             # fuse sounds and saliency
 
             # output all established stuff
-            for euser in eusers:
-                self.euser_pub.publish(euser)
+            for eface in efaces:
+                self.eface_pub.publish(eface)
 
             # TODO: send markers to RViz
             #if self.visualize:
             #    ()
 
-            #prune_before_time = ts - self.user_keep_time
+            #prune_before_time = ts - self.face_keep_time
 
-            # clean out old users from self.cusers
-            for camera_id in self.cusers:
-                for cuser_id in self.cusers[camera_id]:
+            # clean out old faces from self.cfaces
+            for camera_id in self.cfaces:
+                for cface_id in self.cfaces[camera_id]:
                     ()
-                    #if self.cusers[camera_id][cuser_id].ts.to_sec() < prune_before_time:
+                    #if self.cfaces[camera_id][cface_id].ts.to_sec() < prune_before_time:
 
             # clean out old hands from self.chands
             for camera_id in self.chands:

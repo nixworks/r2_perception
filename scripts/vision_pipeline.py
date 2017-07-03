@@ -12,7 +12,7 @@ import cv2
 import tf
 import math
 import geometry_msgs
-from user_predictor import UserPredictor
+from face_predictor import FacePredictor
 from hand_predictor import HandPredictor
 from saliency_predictor import SaliencyPredictor
 from dynamic_reconfigure.server import Server
@@ -20,7 +20,7 @@ from r2_perception.cfg import vision_pipelineConfig as VisionConfig
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 from math import sqrt
-from r2_perception.msg import Face,Hand,Saliency,FaceRequest,FaceResponse,CandidateUser,CandidateHand,CandidateSaliency
+from r2_perception.msg import Face,Hand,Saliency,FaceRequest,FaceResponse,CandidateFace,CandidateHand,CandidateSaliency
 from visualization_msgs.msg import Marker
 from threading import Lock
 from geometry_msgs.msg import Point,PointStamped
@@ -31,7 +31,7 @@ opencv_bridge = CvBridge()
 
 serial_number = 0
 
-def GenerateCandidateUserID():
+def GenerateCandidateFaceID():
     global serial_number
     result = serial_number
     serial_number += 10
@@ -63,7 +63,7 @@ class VisionPipeline(object):
         cv2.startWindowThread()
 
         # clear candidate dicts
-        self.cusers = {}
+        self.cfaces = {}
         self.chands = {}
         self.csaliencies = {}
 
@@ -117,11 +117,11 @@ class VisionPipeline(object):
         self.min_hand_confidence = rospy.get_param("min_hand_confidence")
         self.min_saliency_confidence = rospy.get_param("min_saliency_confidence")
 
-        self.user_keep_time = rospy.get_param("user_keep_time")
+        self.face_keep_time = rospy.get_param("face_keep_time")
         self.hand_keep_time = rospy.get_param("hand_keep_time")
         self.saliency_keep_time = rospy.get_param("saliency_keep_time")
 
-        self.full_user_points = rospy.get_param("full_user_points")
+        self.full_face_points = rospy.get_param("full_face_points")
         self.full_hand_points = rospy.get_param("full_hand_points")
         self.full_saliency_points = rospy.get_param("full_saliency_points")
 
@@ -139,7 +139,7 @@ class VisionPipeline(object):
         self.hand_sub = rospy.Subscriber("raw_hand",Hand,self.HandleHand)
         self.saliency_sub = rospy.Subscriber("raw_saliency",Saliency,self.HandleSaliency)
 
-        self.cuser_pub = rospy.Publisher("cuser",CandidateUser,queue_size=5)
+        self.cface_pub = rospy.Publisher("cface",Candidateface,queue_size=5)
         self.chand_pub = rospy.Publisher("chand",CandidateHand,queue_size=5)
         self.csaliency_pub = rospy.Publisher("csaliency",CandidateSaliency,queue_size=5)
  
@@ -190,11 +190,11 @@ class VisionPipeline(object):
         self.min_hand_confidence = data.min_hand_confidence
         self.min_saliency_confidence = data.min_saliency_confidence
 
-        self.user_keep_time = data.user_keep_time
+        self.face_keep_time = data.face_keep_time
         self.hand_keep_time = data.hand_keep_time
         self.saliency_keep_time = data.saliency_keep_time
 
-        self.full_user_points = data.full_user_points
+        self.full_face_points = data.full_face_points
         self.full_hand_points = data.full_hand_points
         self.full_saliency_points = data.full_saliency_points
 
@@ -210,16 +210,16 @@ class VisionPipeline(object):
             if data.ts.secs == 0:
                 data.ts = rospy.get_rostime()
 
-            # find closest candidate user
-            closest_cuser_id = 0
+            # find closest candidate face
+            closest_cface_id = 0
             closest_dist = self.face_fuse_distance
-            for cuser_id in self.cusers:
+            for cface_id in self.cfaces:
 
-                # find where the candidate user would be right now
+                # find where the candidate face would be right now
                 if self.face_regression_flag:
-                    face = self.cusers[cuser_id].Extrapolate(data.ts)
+                    face = self.cfaces[cface_id].Extrapolate(data.ts)
                 else:
-                    face = self.cusers[cuser_id].faces[-1]
+                    face = self.cfaces[cface_id].faces[-1]
 
                 # calculate distance
                 dx = data.position.x - face.position.x
@@ -228,30 +228,30 @@ class VisionPipeline(object):
                 d = sqrt(dx * dx + dy * dy + dz * dz)
 
                 # update closest
-                if (closest_cuser_id == 0) or (d < closest_dist):
-                    closest_cuser_id = cuser_id
+                if (closest_cface_id == 0) or (d < closest_dist):
+                    closest_cface_id = cface_id
                     closest_dist = d
 
             # if close enough to existing face
             if closest_dist < face_fuse_distance:
 
-                # fuse with existing candidate user
-                self.cusers[closest_cuser_id].Append(data)
+                # fuse with existing candidate face
+                self.cfaces[closest_cface_id].Append(data)
 
             else:
 
-                # create new candidate user, starting with this face
-                closest_cuser_id = GenerateCandidateUserID()
-                cuser = UserPredictor()
-                cuser.Append(data)
+                # create new candidate face, starting with this face
+                closest_cface_id = GenerateCandidateFaceID()
+                cface = FacePredictor()
+                cface.Append(data)
 
-                self.cusers[closest_cuser_id] = cuser
+                self.cfaces[closest_cface_id] = cface
 
                 # send face analysis request to face_analysis
                 msg = FaceRequest()
                 msg.session_id = self.session_id
                 msg.camera_id = self.camera_id
-                msg.cuser_id = closest_cuser_id
+                msg.cface_id = closest_cface_id
                 msg.face_id = data.face_id
                 msg.ts = data.ts
                 msg.thumb = data.thumb
@@ -260,8 +260,8 @@ class VisionPipeline(object):
             # store thumbnail
             if self.store_thumbs_flag:
 
-                cuser_tag = "cuser_%08X" % (closest_cuser_id & 0xFFFFFFFF)
-                thumb_dir = self.thumbs_output_dir + cuser_tag + "/"
+                cface_tag = "cface_%08X" % (closest_cface_id & 0xFFFFFFFF)
+                thumb_dir = self.thumbs_output_dir + cface_tag + "/"
                 if not os.path.exists(thumb_dir):
                     os.makedirs(thumb_dir)
                 image = opencv_bridge.imgmsg_to_cv2(data.thumb)
@@ -279,12 +279,12 @@ class VisionPipeline(object):
             if data.ts.secs == 0:
                 data.ts = rospy.get_rostime()
 
-            # find closest candidate user
+            # find closest candidate face
             closest_chand_id = 0
             closest_dist = self.hand_fuse_distance
             for chand_id in self.chands:
 
-                # find where the candidate user would be right now
+                # find where the candidate face would be right now
                 if self.hand_regression_flag:
                     hand = self.chands[chand_id].Extrapolate(data.ts)
                 else:
@@ -331,7 +331,7 @@ class VisionPipeline(object):
             closest_dist = self.saliency_fuse_distance
             for csaliency_id in self.csaliencies:
 
-                # find where the candidate user would be right now                
+                # find where the candidate face would be right now                
                 if self.saliency_regression_flag:
                     saliency = self.csaliencies[csaliency_id].Extrapolate(data.ts)
                 else:
@@ -367,19 +367,19 @@ class VisionPipeline(object):
     # when a face was analyzed
     def HandleFaceResponse(self,data):
 
-        # if the candidate user doesn't exist anymore, forget the result
-        if data.cuser_id not in self.cusers:
+        # if the candidate face doesn't exist anymore, forget the result
+        if data.cface_id not in self.cfaces:
             return
 
         with self.lock:
 
             # update the settings
-            self.cusers[data.cuser_id].age = data.age
-            self.cusers[data.cuser_id].age_confidence = data.age_confidence
-            self.cusers[data.cuser_id].gender = data.gender
-            self.cusers[data.cuser_id].gender_confidence = data.gender_confidence
-            self.cusers[data.cuser_id].identity = data.identity
-            self.cusers[data.cuser_id].identity_confidence = data.identity_confidence
+            self.cfaces[data.cface_id].age = data.age
+            self.cfaces[data.cface_id].age_confidence = data.age_confidence
+            self.cfaces[data.cface_id].gender = data.gender
+            self.cfaces[data.cface_id].gender_confidence = data.gender_confidence
+            self.cfaces[data.cface_id].identity = data.identity
+            self.cfaces[data.cface_id].identity_confidence = data.identity_confidence
 
 
     # when a new camera image arrives
@@ -410,30 +410,30 @@ class VisionPipeline(object):
             # get current time
             ts = rospy.get_rostime()
 
-            # display candidate users as red circles
-            for cuser_id in self.cusers:
+            # display candidate faces as red circles
+            for cface_id in self.cfaces:
 
                 # the face
                 if self.face_regression_flag:
-                    face = self.cusers[cuser_id].Extrapolate(ts)
+                    face = self.cfaces[cface_id].Extrapolate(ts)
                 else:
-                    face = self.cusers[cuser_id].faces[-1]
+                    face = self.cfaces[cface_id].faces[-1]
                 x = int((0.5 + 0.5 * face.rect.origin.x) * float(width))
                 y = int((0.5 + 0.5 * face.rect.origin.y) * float(height))
                 cv2.circle(image,(x,y),10,(0,0,255),2)
 
                 # annotate with info if available
                 label = ""
-                if self.cusers[cuser_id].identity_confidence > 0.0:
-                    label = self.cusers[cuser_id].identity
-                if self.cusers[cuser_id].age_confidence > 0.0:
+                if self.cfaces[cface_id].identity_confidence > 0.0:
+                    label = self.cfaces[cface_id].identity
+                if self.cfaces[cface_id].age_confidence > 0.0:
                     if label != "":
                         label += ", "
-                    label += str(int(self.cusers[cuser_id].age)) + " y/o"
-                if self.cusers[cuser_id].gender_confidence > 0.0:
+                    label += str(int(self.cfaces[cface_id].age)) + " y/o"
+                if self.cfaces[cface_id].gender_confidence > 0.0:
                     if label != "":
                         label += ", "
-                    if self.cusers[cuser_id].gender == 2:
+                    if self.cfaces[cface_id].gender == 2:
                         label += "female"
                     else:
                         label += "male"
@@ -460,14 +460,14 @@ class VisionPipeline(object):
             cv2.imshow(self.name,image)
 
 
-    # send markers to RViz for a user
-    def SendUserMarkers(self,frame_id,ts,cuser_id,ns,position):
+    # send markers to RViz for a face
+    def SendFaceMarkers(self,frame_id,ts,cface_id,ns,position):
 
         # the face
         marker = Marker()
         marker.header.frame_id = frame_id
         marker.header.stamp = ts
-        marker.id = cuser_id
+        marker.id = cface_id
         marker.ns = ns
         marker.type = Marker.SPHERE
         marker.action = Marker.MODIFY
@@ -493,7 +493,7 @@ class VisionPipeline(object):
         marker = Marker()
         marker.header.frame_id = frame_id
         marker.header.stamp = ts
-        marker.id = cuser_id + 1
+        marker.id = cface_id + 1
         marker.ns = ns
         marker.type = Marker.TEXT_VIEW_FACING
         marker.action = Marker.MODIFY
@@ -511,11 +511,11 @@ class VisionPipeline(object):
         marker.color.g = 0.7
         marker.color.b = 0.7
         marker.color.a = 0.5
-        if self.cusers[cuser_id].gender == 2:
+        if self.cfaces[cface_id].gender == 2:
             gender = "female"
         else:
             gender = "male"
-        marker.text = self.name + " candidate {} ({} {})".format(cuser_id,gender,int(self.cusers[cuser_id].age))
+        marker.text = self.name + " candidate {} ({} {})".format(cface_id,gender,int(self.cfaces[cface_id].age))
         marker.lifetime = rospy.Duration(2,0)
         marker.frame_locked = False
         self.face_rviz_pub.publish(marker)
@@ -622,16 +622,16 @@ class VisionPipeline(object):
 
         with self.lock:
 
-            # mine the current candidate users for confident ones and send them off
-            for cuser_id in self.cusers:
-                conf = self.cusers[cuser_id].CalculateConfidence(self.full_face_points)
+            # mine the current candidate faces for confident ones and send them off
+            for cface_id in self.cfaces:
+                conf = self.cfaces[cface_id].CalculateConfidence(self.full_face_points)
                 if conf >= self.min_face_confidence:
 
-                    # get best candidate user
+                    # get best candidate face
                     if self.face_regression_flag:
-                        cuser = self.cusers[cuser_id].Extrapolate(ts)
+                        cface = self.cfaces[cface_id].Extrapolate(ts)
                     else:
-                        cuser = self.cusers[cuser_id].faces[-1]
+                        cface = self.cfaces[cface_id].faces[-1]
 
                     if self.listener.canTransform("world",self.name,ts):
 
@@ -640,47 +640,47 @@ class VisionPipeline(object):
                         ps.header.seq = 0
                         ps.header.stamp = ts
                         ps.header.frame_id = self.name
-                        ps.point.x = cuser.position.x
-                        ps.point.y = cuser.position.y
-                        ps.point.z = cuser.position.z
+                        ps.point.x = cface.position.x
+                        ps.point.y = cface.position.y
+                        ps.point.z = cface.position.z
 
                         # transform to world coordinates
                         pst = self.listener.transformPoint("world",ps)
 
-                        # setup candidate user message
-                        msg = CandidateUser()
+                        # setup candidate face message
+                        msg = Candidateface()
                         msg.session_id = self.session_id
                         msg.camera_id = self.camera_id
-                        msg.cuser_id = cuser_id
+                        msg.cface_id = cface_id
                         msg.ts = ts
                         msg.position.x = pst.point.x
                         msg.position.y = pst.point.y
                         msg.position.z = pst.point.z
-                        msg.confidence = cuser.confidence
-                        msg.smile = cuser.smile
-                        msg.frown = cuser.frown
-                        msg.expressions = cuser.expressions
-                        msg.age = self.cusers[cuser_id].age
-                        msg.age_confidence = self.cusers[cuser_id].age_confidence
-                        msg.gender = self.cusers[cuser_id].gender
-                        msg.gender_confidence = self.cusers[cuser_id].gender_confidence
-                        msg.identity = self.cusers[cuser_id].identity
-                        msg.identity_confidence = self.cusers[cuser_id].identity_confidence
-                        self.cuser_pub.publish(msg)
+                        msg.confidence = cface.confidence
+                        msg.smile = cface.smile
+                        msg.frown = cface.frown
+                        msg.expressions = cface.expressions
+                        msg.age = self.cfaces[cface_id].age
+                        msg.age_confidence = self.cfaces[cface_id].age_confidence
+                        msg.gender = self.cfaces[cface_id].gender
+                        msg.gender_confidence = self.cfaces[cface_id].gender_confidence
+                        msg.identity = self.cfaces[cface_id].identity
+                        msg.identity_confidence = self.cfaces[cface_id].identity_confidence
+                        self.cface_pub.publish(msg)
 
                     # output markers to rviz
                     if self.visualize_flag and self.visualize_candidates_flag:
-                        self.SendUserMarkers(self.name,ts,cuser_id,"/robot/perception/{}".format(self.name),cuser.position)
+                        self.SendFaceMarkers(self.name,ts,cface_id,"/robot/perception/{}".format(self.name),cface.position)
 
-            # prune the candidate users and remove them if they disappeared
+            # prune the candidate faces and remove them if they disappeared
             to_be_removed = []
-            prune_before_time = ts - rospy.Duration.from_sec(self.user_keep_time)
-            for cuser_id in self.cusers:
-                self.cusers[cuser_id].PruneBefore(prune_before_time)
-                if len(self.cusers[cuser_id].faces) == 0:
-                    to_be_removed.append(cuser_id)
+            prune_before_time = ts - rospy.Duration.from_sec(self.face_keep_time)
+            for cface_id in self.cfaces:
+                self.cfaces[cface_id].PruneBefore(prune_before_time)
+                if len(self.cfaces[cface_id].faces) == 0:
+                    to_be_removed.append(cface_id)
             for key in to_be_removed:
-                del self.cusers[key]
+                del self.cfaces[key]
 
             # mine the current candidate hands for confident ones and send them off
             for chand_id in self.chands:

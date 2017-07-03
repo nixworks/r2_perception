@@ -1,6 +1,6 @@
 uint32 session_id
 uint32 camera_id
-uint32 cuser_id
+uint32 cface_id
 time ts
 Float32XYZ position
 float32 confidence

@@ -33,8 +33,6 @@ class HearingPipeline(object):
         if not os.path.exists(self.sounds_dir):
             os.makedirs(self.sounds_dir)
 
-        self.pusers = {}
-
         self.sound_sub = rospy.Subscriber("raw_sound",Sound,self.HandleSound)
         self.speech_sub = rospy.Subscriber("raw_speech",Speech,self.HandleSpeech)
 
