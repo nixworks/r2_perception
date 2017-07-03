@@ -3,46 +3,41 @@
 
 	<arg name="name"/>
 
-	<!-- Haar Cascade resource for detect_faces_haar.py -->
-	<param name="haar_cascade" value="$(find r2_perception)/test/haarcascade_frontalface_alt.xml"/>
-
-	<!-- temporary directory for face analysis -->
-	<param name="analysis_temp_dir" value="$(find r2_perception)/test"/>
-
-	<!-- directory to store thumbnails, if "store_thumbs" is true -->
-	<param name="thumbs_dir" value="$(find r2_perception)/test/thumbs"/>
-
-	<!-- directory to store sounds, if "store_sounds" is true -->
-	<param name="sounds_dir" value="$(find r2_perception)/test/sounds"/>
-	
-	<!-- geometry description -->
-	<param name="robot_description" textfile="$(find r2_perception)/test/robot.urdf"/>
-
-	<!-- whether or not to show camera feed debug windows -->
-	<param name="debug" value="true"/>
-
-	<!-- whether or not to store all thumbnails from the cameras -->
-	<param name="store_thumbs" value="true"/>
-
-	<!-- whether or not to store all sounds from the microphones -->
-	<param name="store_sounds" value="false"/>
-
-	<!-- whether or not to use RViz -->
-	<param name="visualization" value="true"/>
-
-	<!-- whether to visualize the pipeline candidates or the final result -->
-	<param name="visualize_pipeline" value="true"/>
-
-	<!-- whether or not to display thumbs in visualization -->
-	<param name="visualize_thumbs" value="false"/>
-
-	<!-- height of a standard face, in meters, as they are cut out by the face detection -->
-	<param name="face_height" value="0.155"/>
-
 	<!-- while we're still using Blender in the old backend, so update transformations accordingly -->
 	<!-- gather Blender PAU messages and generate joint_states, and update tf from that -->
 	<node name="gather_pau_states" type="gather_pau_states.py" pkg="r2_perception"/>
 	<node name="robot_state_publisher" type="state_publisher" pkg="robot_state_publisher"/>
+
+	<!-- geometry description -->
+	<param name="robot_description" textfile="$(find r2_perception)/test/robot.urdf"/>
+
+	<!-- where to store temporaries for face analysis -->
+	<param name="face_analysis_temp_dir" value="$(find r2_perception)/test"/>
+
+	<!-- whether or not to store thumbnails -->
+	<param name="store_thumbs_flag" value="false"/>
+
+	<!-- directory to store face thumbnails -->
+	<param name="thumbs_dir" value="$(find r2_perception)/test"/>
+
+	<!-- face thumbnail extension -->
+	<param name="thumbs_ext" value="png"/>
+
+	<!-- whether or not to store sounds -->
+	<param name="store_sounds_flag" value="false"/>
+
+	<!-- directory to store sounds -->
+	<param name="sounds_dir" value="$(find r2_perception)/test"/>
+
+	<!-- filename for Haar cascade -->
+	<param name="haar_cascade_filename" value="$(find r2_perception)/test/haarcascade_frontalface_alt.xml"/>
+
+	<!-- visualization via RViz -->
+	<param name="visualize_flag" value="true"/>
+
+	<!-- size of face thumbnail -->
+	<param name="thumb_width" value="64"/>
+	<param name="thumb_height" value="64"/>
 
 	<!-- /robot -->
 	<group ns="/$(arg name)">
@@ -50,19 +45,11 @@
 		<!-- perception subsystem -->
 		<group ns="perception">
 
+			<!-- load all parameters from yaml -->
+			<rosparam file="$(find r2_perception)/test/perception.yaml" command="load"/>
+
 			<!-- left eye camera -->
 			<group ns="lefteye">
-				<param name="fovy" value="1.2"/>
-				<param name="aspect" value="1.33333"/>
-				<param name="rotate" value="-90"/>
-				<param name="camera_rate" value="10.0"/>
-				<param name="face_detect_rate" value="10.0"/>
-				<param name="hand_detect_rate" value="1.0"/>
-				<param name="saliency_detect_rate" value="5.0"/>
-				<param name="vision_rate" value="20.0"/>
-				<param name="face_regression" value="true"/>
-				<param name="hand_regression" value="true"/>
-				<param name="saliency_regression" value="false"/>
 				<node name="camera" type="usb_cam_node" pkg="usb_cam">
 					<param name="video_device" value="/dev/video1"/>
 					<param name="pixel_format" value="yuyv"/>
@@ -78,17 +65,6 @@
 
 			<!-- right eye camera -->
 			<!--<group ns="righteye">
-				<param name="fovy" value="1.2"/>
-				<param name="aspect" value="1.33333"/>
-				<param name="rotate" value="90"/>
-				<param name="camera_rate" value="10.0"/>
-				<param name="face_detect_rate" value="10.0"/>
-				<param name="hand_detect_rate" value="1.0"/>
-				<param name="saliency_detect_rate" value="5.0"/>
-				<param name="vision_rate" value="20.0"/>
-				<param name="face_regression" value="true"/>
-				<param name="hand_regression" value="true"/>
-				<param name="saliency_regression" value="false"/>
 				<node name="camera" type="usb_cam_node" pkg="usb_cam">
 					<param name="video_device" value="/dev/video2"/>
 					<param name="pixel_format" value="yuyv"/>
@@ -104,17 +80,6 @@
 
 			<!-- RealSense camera -->
 			<group ns="realsense">
-				<param name="fovy" value="1.0"/>
-				<param name="aspect" value="1.33333"/>
-				<param name="camera_rate" value="10.0"/>
-				<param name="rotate" value="0"/>
-				<param name="face_detect_rate" value="10.0"/>
-				<param name="hand_detect_rate" value="1.0"/>
-				<param name="saliency_detect_rate" value="5.0"/>
-				<param name="vision_rate" value="20.0"/>
-				<param name="face_regression" value="true"/>
-				<param name="hand_regression" value="true"/>
-				<param name="saliency_regression" value="false"/>
 				<node name="realsense_param_proxy" type="realsense_param_proxy.py" pkg="r2_perception"/>
 				<node name="face_analysis" type="face_analysis_openbr.py" pkg="r2_perception"/>
 				<node name="vision_pipeline" type="vision_pipeline.py" pkg="r2_perception"/>
@@ -122,17 +87,6 @@
 
 			<!-- wideangle camera -->
 			<group ns="wideangle">
-				<param name="fovy" value="0.82"/>
-				<param name="aspect" value="1.33333"/>
-				<param name="camera_rate" value="10.0"/>
-				<param name="rotate" value="0"/>
-				<param name="face_detect_rate" value="20.0"/>
-				<param name="hand_detect_rate" value="5.0"/>
-				<param name="saliency_detect_rate" value="5.0"/>
-				<param name="vision_rate" value="20.0"/>
-				<param name="face_regression" value="true"/>
-				<param name="hand_regression" value="false"/>
-				<param name="saliency_regression" value="false"/>
 				<node name="camera" type="usb_cam_node" pkg="usb_cam">
 					<param name="video_device" value="/dev/video0"/>
 					<param name="pixel_format" value="yuyv"/>
@@ -149,11 +103,6 @@
 			<!-- Acoustic Magic microphone array -->
 			<!--<group ns="acousticmagic">
 				<param name="device" value="hw:2,0"/>
-				<param name="threshold" value="0.3"/>
-				<param name="linger" value="0.2"/>
-				<param name="mic_rate" value="16000.0"/>
-				<param name="sound_detect_rate" value="10.0"/>
-				<param name="localization" value="true"/>
 				<param name="port" value="/dev/ttyUSB0"/>
 				<node name="detect_sound" type="detect_sound_hyst.py" pkg="r2_perception"/>
 				<node name="speech_to_text_google" type="speech_to_text.py" pkg="r2_perception"/>
@@ -163,11 +112,6 @@
 			<!-- handheld microphone -->
 			<!--<group ns="handheld">
 				<param name="device" value="hw:1,0"/>
-				<param name="threshold" value="0.3"/>
-				<param name="linger" value="0.2"/>
-				<param name="mic_rate" value="16000.0"/>
-				<param name="sound_detect_rate" value="10.0"/>
-				<param name="localization" value="false"/>
 				<param name="port" value="/dev/ttyUSB0"/>
 				<node name="detect_sound" type="detect_sound_hyst.py" pkg="r2_perception"/>
 				<node name="speech_to_text_google" type="speech_to_text.py" pkg="r2_perception"/>
@@ -175,6 +119,7 @@
 			</group>-->
 
 			<!-- fusion node -->
+			<param name="fusion_rate" value="20.0"/>
 			<node name="fusion" type="fusion.py" pkg="r2_perception"/>
 
 			<!-- visualization of perception/input/sensor fusion -->

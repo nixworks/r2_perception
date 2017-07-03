@@ -47,20 +47,33 @@ class DetectHands(object):
         # create lock
         self.lock = Lock()
 
+        # start possible debug window
+        cv2.startWindowThread()
+
         # initialize current frame and timestamp
         self.cur_image = Image()
         self.cur_ts = 0.0
 
-        # get local parameters
+        # get pipeline name
+        self.name = rospy.get_namespace().split('/')[-2]
+
+        # get parameters
+        self.debug_hand_detect_flag = rospy.get_param("debug_hand_detect_flag")
+        if self.debug_hand_detect_flag:
+            cv2.namedWindow(self.name + " hands")
+
         self.fovy = rospy.get_param("fovy")
         self.aspect = rospy.get_param("aspect")
-        self.hand_detect_rate = rospy.get_param("hand_detect_rate")
+        self.rotate = rospy.get_param("rotate")
 
-        # start timer
+        self.hand_detect_rate = rospy.get_param("hand_detect_rate")
         self.timer = rospy.Timer(rospy.Duration(1.0 / self.hand_detect_rate),self.HandleTimer)
 
+        self.hand_detect_work_width = rospy.get_param("hand_detect_work_width")
+        self.hand_detect_work_height = rospy.get_param("hand_detect_work_height")
+
         # start dynamic reconfigure client
-        #self.dynparam = dynamic_reconfigure.client.Client("vision_pipeline",timeout=30,config_callback=self.HandleConfig)        
+        self.dynparam = dynamic_reconfigure.client.Client("vision_pipeline",timeout=30,config_callback=self.HandleConfig)        
 
         # start subscriber and publisher
         self.image_sub = rospy.Subscriber("camera/image_raw",Image,self.HandleImage)
@@ -70,14 +83,26 @@ class DetectHands(object):
     # when a dynamic reconfigure update occurs
     def HandleConfig(self,data):
 
-        # copy parameters from server
+        new_debug_hand_detect_flag = data.debug_hand_detect_flag
+        if new_debug_hand_detect_flag != self.debug_hand_detect_flag:
+            self.debug_hand_detect_flag = new_debug_hand_detect_flag
+            if self.debug_hand_detect_flag:
+                cv2.namedWindow(self.name + " hands")
+            else:
+                cv2.destroyWindow(self.name + " hands")
+
         self.fovy = data.fovy
         self.aspect = data.aspect
-        self.hand_detect_rate = data.hand_detect_rate
+        self.rotate = data.rotate
 
-        # reset timer
-        self.timer.shutdown()
-        self.timer = rospy.Timer(rospy.Duration(1.0 / self.hand_detect_rate),self.HandleTimer)
+        new_hand_detect_rate = data.hand_detect_rate
+        if new_hand_detect_rate != self.hand_detect_rate:
+            self.hand_detect_rate = new_hand_detect_rate
+            self.timer.shutdown()
+            self.timer = rospy.Timer(rospy.Duration(1.0 / self.hand_detect_rate),self.HandleTimer)            
+
+        self.hand_detect_work_width = data.hand_detect_work_width
+        self.hand_detect_work_height = data.hand_detect_work_height
 
 
     # when a camera image arrives
@@ -85,6 +110,7 @@ class DetectHands(object):
 
         with self.lock:
 
+            # copy the image and update the timestamp
             self.cur_image = data
             self.cur_ts = rospy.get_rostime()
 
@@ -98,11 +124,11 @@ class DetectHands(object):
             if self.cur_ts == 0.0:
                 return
 
-            # TEMPLATE: detect all hands
+            # TODO: detect all the hands
 
-            # TEMPLATE: if there are no hands detected, exit
+            # TODO: if there are no hands detected, exit
 
-            # TEMPLATE: publish all hands
+            # TODO: publish all the hands
 
 
 if __name__ == '__main__':

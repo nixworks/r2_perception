@@ -11,8 +11,13 @@ from r2_perception.msg import CandidateUser,CandidateHand,CandidateSaliency,Esta
 from threading import Lock
 
 
-# maximum keep time (seconds)
-time_difference = rospy.Time(1,0)
+class UserLink(object):
+
+
+    def __init__(self):
+
+        self.camera_id = 0
+        self.cuser_id = 0
 
 
 class UserLink(object):
@@ -36,18 +41,17 @@ class Fusion(object):
         # create lock
         self.lock = Lock()
 
-        # get parameters
-        self.debug = rospy.get_param("/debug")
-        self.store_thumbs = rospy.get_param("/store_thumbs")
-        self.visualization = rospy.get_param("/visualization")
-        self.visualize_pipeline = rospy.get_param("/visualize_pipeline")
+        # get fixed parameters
+        self.store_thumbs_flag = rospy.get_param("/store_thumbs_flag")
 
         self.session_tag = str(rospy.get_param("/session_tag"))
         self.session_id = hash(self.session_tag) & 0xFFFFFFFF
 
-        self.rate = 30.0
+        #self.visualize = rospy.get_param("/visualize")
 
-        self.timer = rospy.Timer(rospy.Duration(1.0 / self.rate),self.HandleTimer)
+        # get dynamic parameters (TODO: dynamic reconfigure for fusion too)
+        self.fusion_rate = rospy.get_param("fusion_rate")
+        self.timer = rospy.Timer(rospy.Duration(1.0 / self.fusion_rate),self.HandleTimer)
 
         self.cuser_subs = []
         self.cuser_subs.append(rospy.Subscriber("lefteye/cuser",CandidateUser,self.HandleCandidateUser))
@@ -286,10 +290,10 @@ class Fusion(object):
                 self.euser_pub.publish(euser)
 
             # TODO: send markers to RViz
-            if self.visualization:
-                ()
+            #if self.visualize:
+            #    ()
 
-            prune_before_time = ts - time_difference
+            #prune_before_time = ts - self.user_keep_time
 
             # clean out old users from self.cusers
             for camera_id in self.cusers:

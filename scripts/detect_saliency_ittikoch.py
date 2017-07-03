@@ -35,8 +35,10 @@ from threading import Lock
 # create OpenCV-ROS bridge object
 opencv_bridge = CvBridge()
 
+
 # Generate unique serial number for the raw salient points
 serial_number = 0
+
 def GenerateSaliencyID():
     global serial_number
     result = serial_number
@@ -45,24 +47,13 @@ def GenerateSaliencyID():
 
 
 def cv2normalize(image):
-    # I probably don't understand OpenCV too well...
+    
     dest = image.copy()
     cv2.normalize(cv2.absdiff(image,0.0),dest,0.0,1.0,cv2.NORM_MINMAX)
     return dest
 
-
-class FoundPoint(object):
-
-    def __init__(self):
-
-        self.position = (0,0,0)
-        self.motion = 0
-        self.vmap = 0
-        self.umap = 0
-        self.contrast = 0
-
-
-class DetectSaliency(object):
+  
+class DetectSaliencyIttiKoch(object):
 
 
     # constructor
@@ -71,159 +62,195 @@ class DetectSaliency(object):
         # create lock
         self.lock = Lock()
 
+        # start possible debug window
+        cv2.startWindowThread()
+
         # initialize current and last frame and timestamps
         self.cur_image = Image()
         self.last_image = Image()
         self.cur_ts = 0.0
         self.last_ts = 0.0
 
-        # get global parameters
-        self.debug = rospy.get_param("/debug")
+        # get pipeline name
+        self.name = rospy.get_namespace().split('/')[-2]
 
-        # get local parameters
+        # get parameters
+        self.debug_saliency_detect_flag = rospy.get_param("debug_saliency_detect_flag")
+        if self.debug_saliency_detect_flag:
+            cv2.namedWindow(self.name + " saliency")
+
         self.fovy = rospy.get_param("fovy")
         self.aspect = rospy.get_param("aspect")
         self.rotate = rospy.get_param("rotate")
-        self.saliency_detect_rate = rospy.get_param("saliency_detect_rate")
 
-        # start timer
+        self.saliency_detect_rate = rospy.get_param("saliency_detect_rate")
         self.timer = rospy.Timer(rospy.Duration(1.0 / self.saliency_detect_rate),self.HandleTimer)
 
-        # start dynamic reconfigure client
-        #self.dynparam = dynamic_reconfigure.client.Client("vision_pipeline",timeout=30,config_callback=self.HandleConfig)        
+        self.saliency_detect_work_width = rospy.get_param("saliency_detect_work_width")
+        self.saliency_detect_work_height = rospy.get_param("saliency_detect_work_height")
+
+        self.ittikoch_reduced_width = rospy.get_param("ittikoch_reduced_width")
+        self.ittikoch_reduced_height = rospy.get_param("ittikoch_reduced_height")
+        self.ittikoch_gaussian_size = rospy.get_param("ittikoch_gaussian_size")
+        self.ittikoch_motion_factor = rospy.get_param("ittikoch_motion_factor") # 0.5
+        self.ittikoch_color_factor = rospy.get_param("ittikoch_color_factor") # 0.2
+        self.ittikoch_contrast_factor = rospy.get_param("ittikoch_contrast_factor") # 0.1
+        self.ittikoch_num_points = rospy.get_param("ittikoch_num_points")
+        self.ittikoch_eraser_radius = rospy.get_param("ittikoch_eraser_radius")
+
+        # start dynamic reconfigure client from vision_pipeline
+        self.dynparam = dynamic_reconfigure.client.Client("vision_pipeline",timeout=30,config_callback=self.HandleConfig)        
 
         # start subscriber and publisher
         self.image_sub = rospy.Subscriber("camera/image_raw",Image,self.HandleImage)
         self.saliency_pub = rospy.Publisher("raw_saliency",Saliency,queue_size=5)
 
-        # debugging:
-        if self.debug:
-            cv2.startWindowThread()
-            cv2.namedWindow("faux saliency")
-
 
     def HandleConfig(self,data):
+
+        new_debug_saliency_detect_flag = data.debug_saliency_detect_flag
+        if new_debug_saliency_detect_flag != self.debug_saliency_detect_flag:
+            self.debug_saliency_detect_flag = new_debug_saliency_detect_flag
+            if self.debug_saliency_detect_flag:
+                cv2.namedWindow(self.name + " saliency")
+            else:
+                cv2.destroyWindow(self.name + " saliency")
 
         self.fovy = data.fovy
         self.aspect = data.aspect
         self.rotate = data.rotate
-        self.saliency_detect_rate = data.saliency_detect_rate
 
-        # reset timer
-        self.timer.shutdown()
-        self.timer = rospy.Timer(rospy.Duration(1.0 / self.saliency_detect_rate),self.HandleTimer)
+        new_saliency_detect_rate = data.saliency_detect_rate
+        if new_saliency_detect_rate != self.saliency_detect_rate:
+            self.saliency_detect_rate = new_saliency_detect_rate
+            self.timer.shutdown()
+            self.timer = rospy.Timer(rospy.Duration(1.0 / self.saliency_detect_rate),self.HandleTimer)
+
+        self.saliency_detect_work_width = data.saliency_detect_work_width
+        self.saliency_detect_work_height = data.saliency_detect_work_height
+
+        self.ittikoch_reduced_width = data.ittikoch_reduced_width
+        self.ittikoch_reduced_height = data.ittikoch_reduced_height
+        self.ittikoch_gaussian_size = data.ittikoch_gaussian_size
+        self.ittikoch_motion_factor = data.ittikoch_motion_factor
+        self.ittikoch_color_factor = data.ittikoch_color_factor
+        self.ittikoch_contrast_factor = data.ittikoch_contrast_factor
+        self.ittikoch_num_points = data.ittikoch_num_points
+        self.ittikoch_eraser_radius = data.ittikoch_eraser_radius
 
 
+    # when an new camera image arrives
     def HandleImage(self,data):
 
         with self.lock:
 
+            # copy the images and update the timestamps
             self.last_image = self.cur_image
             self.last_ts = self.cur_ts
+
             self.cur_image = data
             self.cur_ts = rospy.get_rostime()
 
 
+    # at saliency detection rate
     def HandleTimer(self,data):
 
         with self.lock:
 
+            # if no images available, exit
             if (self.cur_ts == 0.0) or (self.last_ts == 0):
                 return
 
-            # resolution for feature maps
-            subx = 320
-            suby = 240
+            # calculate distance to camera plane
+            cpd = 1.0 / math.tan(self.fovy)
 
-            covx = 128
-            covy = 96
+            # cache feature map size (change according to rotation)
+            wwidth = self.saliency_detect_work_width
+            wheight = self.saliency_detect_work_height
+            rwidth = self.ittikoch_reduced_width
+            rheight = self.ittikoch_reduced_height
 
-            # convert ROS images to OpenCV and rescale to subx,suby, the working resolution
-            bgr_cur_image = opencv_bridge.imgmsg_to_cv2(self.cur_image)
-            bgr_last_image = opencv_bridge.imgmsg_to_cv2(self.last_image)
-
+            # convert images from ROS to OpenCV, unrotate and rescale
+            bgr_cur_image = cv2.resize(opencv_bridge.imgmsg_to_cv2(self.cur_image),(wwidth,wheight),interpolation=cv2.INTER_LINEAR)
+            bgr_last_image = cv2.resize(opencv_bridge.imgmsg_to_cv2(self.last_image),(wwidth,wheight),interpolation=cv2.INTER_LINEAR)
             if self.rotate == 90:
-                subx = 240
-                suby = 320
-                covx = 96
-                covy = 128
+                wwidth = self.saliency_detect_work_height
+                wheight = self.saliency_detect_work_width
+                rwidth = self.ittikoch_reduced_height
+                rheight = self.ittikoch_reduced_width
+                cpd /= self.aspect
                 bgr_cur_image = cv2.transpose(bgr_cur_image)
                 bgr_last_image = cv2.transpose(bgr_last_image)
-
             elif self.rotate == -90:
-                subx = 240
-                suby = 320
-                covx = 96
-                covy = 128
+                wwidth = self.saliency_detect_work_height
+                wheight = self.saliency_detect_work_width
+                rwidth = self.ittikoch_reduced_height
+                rheight = self.ittikoch_reduced_width
+                cpd /= self.aspect
                 bgr_cur_image = cv2.transpose(bgr_cur_image)
                 bgr_cur_image = cv2.flip(bgr_cur_image,1)
                 bgr_last_image = cv2.transpose(bgr_last_image)
                 bgr_last_image = cv2.flip(bgr_last_image,1)
-
             elif self.rotate == 180:
+                bgr_cur_image = cv2.flip(bgr_cur_image,1)
                 bgr_cur_image = cv2.flip(bgr_cur_image,-1)
+                bgr_last_image = cv2.flip(bgr_last_image,1)
                 bgr_last_image = cv2.flip(bgr_last_image,-1)
 
             # also, convert from BGR to YUV (which is more natural for vision tasks)
-            yuv_u8 = cv2.cvtColor(cv2.resize(bgr_cur_image,(subx,suby),interpolation=cv2.INTER_LINEAR),cv2.COLOR_BGR2YUV)
-            yuv = yuv_u8.astype("float32")
-
-            yuv_last_u8 = cv2.cvtColor(cv2.resize(bgr_last_image,(subx,suby),interpolation=cv2.INTER_LINEAR),cv2.COLOR_BGR2YUV)
-            yuv_last = yuv_last_u8.astype("float32")
+            yuv_cur_image = cv2.cvtColor(bgr_cur_image,cv2.COLOR_BGR2YUV)
+            yuv_cur_image = yuv_cur_image.astype("float32")
+            yuv_last_image = cv2.cvtColor(bgr_last_image,cv2.COLOR_BGR2YUV)
+            yuv_last_image = yuv_last_image.astype("float32")
 
             # generate motion map from difference between last frame and current frame
-            dyuv = cv2.subtract(yuv,yuv_last)
+            dyuv_image = cv2.subtract(yuv_cur_image,yuv_last_image)
 
             # split intensity and color maps
-            yc,uc,vc = cv2.split(yuv) 
-            dyc,duc,dvc = cv2.split(dyuv)
+            y_image,u_image,v_image = cv2.split(yuv_cur_image) 
+            dy_image,du_image,dv_image = cv2.split(dyuv_image)
 
             # use Gaussian blur to create low-pass filtered versions of each map
-            yc4 = cv2.GaussianBlur(yc,(13,13),0) # intensity
-            uc4 = cv2.GaussianBlur(uc,(13,13),0) # red-green
-            vc4 = cv2.GaussianBlur(vc,(13,13),0) # blue-yellow
-            dyc4 = cv2.GaussianBlur(dyc,(13,13),0) # motion
+            y_lowpass_image = cv2.GaussianBlur(y_image,(self.ittikoch_gaussian_size,self.ittikoch_gaussian_size),0) # intensity
+            u_lowpass_image = cv2.GaussianBlur(u_image,(self.ittikoch_gaussian_size,self.ittikoch_gaussian_size),0) # red-green
+            v_lowpass_image = cv2.GaussianBlur(v_image,(self.ittikoch_gaussian_size,self.ittikoch_gaussian_size),0) # blue-yellow
+            dy_lowpass_image = cv2.GaussianBlur(dy_image,(self.ittikoch_gaussian_size,self.ittikoch_gaussian_size),0) # motion
 
             # emulate high-pass filtering (high-frequency content is the 'most interesting') by
             # subtracting low-pass images from unfiltered images
 
             # furthermore, for the non-motion maps, use Laplacian as optical derivative
 
-            # start with the weights
-            motion_factor = 0.5
-            color_factor = 0.2
-            contrast_factor = 0.1
+            # motion image
+            motion_image = cv2normalize(dy_image - dy_lowpass_image)
 
-            # generally, motion is the 'most interesting',
-            motion = cv2normalize(dyc - dyc4)
+            # color responses
+            vmap_image = cv2normalize(cv2.Laplacian(v_image - v_lowpass_image,-1))
+            umap_image = cv2normalize(cv2.Laplacian(u_image - u_lowpass_image,-1))
 
-            # color responses are 'a bit less interesting',
-            vmap = cv2normalize(cv2.Laplacian(vc - vc4,-1))
-            umap = cv2normalize(cv2.Laplacian(uc - uc4,-1))
-
-            # intensity contrast is 'also somewhat interesting'
-            contrast = cv2normalize(cv2.Laplacian(yc - yc4,-1))
+            # intensity contrast
+            contrast_image = cv2normalize(cv2.Laplacian(y_image - y_lowpass_image,-1))
 
             # add all together
-            total = motion * motion_factor + vmap * color_factor + umap * color_factor + contrast * contrast_factor
+            total = motion_image * self.ittikoch_motion_factor + vmap_image * self.ittikoch_color_factor + umap_image * self.ittikoch_color_factor + contrast_image * self.ittikoch_contrast_factor
 
             cpd = 1.0 / math.tan(self.fovy)
 
             # find successively brightest points in a much lower resolution result
-            resized = cv2.resize(total,(covx,covy),interpolation=cv2.INTER_LINEAR)
-            scratch = resized.copy()
+            reduced = cv2.resize(total,(rwidth,rheight),interpolation=cv2.INTER_LINEAR)
+            scratch = reduced.copy()
             points = []
-            for i in range(0,4):
+            for i in range(0,self.ittikoch_num_points):
                 brightest_v = 0.0
                 point = Float32XYZ()
-                for y in range(0,covy):
-                    for x in range(0,covx):
+                for y in range(0,rheight):
+                    for x in range(0,rwidth):
                         if scratch[y,x] > point.z:
-                            point.x = float(x) / float(covx)
-                            point.y = float(y) / float(covy)
+                            point.x = float(x) / float(rwidth)
+                            point.y = float(y) / float(rheight)
                             point.z = scratch[y,x]
                 points.append(point)
-                cv2.circle(scratch,(int(point.x * float(covx)),int(point.y * float(covy))),20,0,-1)
+                cv2.circle(scratch,(int(point.x * float(rwidth)),int(point.y * float(rheight))),self.ittikoch_eraser_radius,0,-1)
 
             # convert to messages and send off
             for point in points:
@@ -240,30 +267,30 @@ class DetectSaliency(object):
                     fy /= flen
                     fz /= flen
 
-                # get coordinates on feature maps
-                x = int(point.x * float(subx))
-                y = int(point.y * float(suby))
+                # get coordinates on feature maps to grab actual features
+                x = int(point.x * float(wwidth))
+                y = int(point.y * float(wheight))
 
-                # and send off
+                # prepare saliency message
                 msg = Saliency()
                 msg.saliency_id = GenerateSaliencyID()
                 msg.ts = self.cur_ts
                 msg.direction.x = fx
                 msg.direction.y = fy
                 msg.direction.z = fz
-                msg.motion = motion[y,x] * motion_factor
-                msg.umap = umap[y,x] * color_factor
-                msg.vmap = vmap[y,x] * color_factor
-                msg.contrast = contrast[y,x] * contrast_factor
+                msg.motion = motion_image[y,x] * self.ittikoch_motion_factor
+                msg.umap = umap_image[y,x] * self.ittikoch_color_factor
+                msg.vmap = vmap_image[y,x] * self.ittikoch_color_factor
+                msg.contrast = contrast_image[y,x] * self.ittikoch_contrast_factor
                 msg.confidence = 1.0
                 self.saliency_pub.publish(msg)
 
-            if self.debug:
-                cv2.imshow("faux saliency",cv2.resize(resized,(subx,suby),interpolation=cv2.INTER_LINEAR))
+            if self.debug_saliency_detect_flag:
+                cv2.imshow(self.name + " saliency",cv2.resize(reduced,(wwidth,wheight),interpolation=cv2.INTER_LINEAR))
 
 
 if __name__ == '__main__':
 
     rospy.init_node('detect_saliency')
-    node = DetectSaliency()
+    node = DetectSaliencyIttiKoch()
     rospy.spin()
