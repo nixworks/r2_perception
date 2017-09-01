@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(r2_perception)
 
+LIST(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/lib/")
+
 ## Add support for C++11, supported in ROS Kinetic and newer
 # add_definitions(-std=c++11)
 
@@ -8,6 +10,8 @@ project(r2_perception)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
+  roscpp
+  genmsg
   rospy
   std_msgs
   sensor_msgs
@@ -17,6 +21,20 @@ find_package(catkin REQUIRED COMPONENTS
   dynamic_reconfigure
 )
 
+# Octomap
+FIND_PACKAGE(Octomap REQUIRED)    
+IF(OCTOMAP_FOUND AND OCTOMAP_LIBRARY)
+	MESSAGE(STATUS "Found Octomap.")
+	ADD_DEFINITIONS(-DHAVE_OCTOMAP) 
+	SET(HAVE_OCTOMAP 1)
+	INCLUDE_DIRECTORIES(${OCTOMAP_INCLUDE_DIR})
+	SET(OCTOMAP_DIR_MESSAGE "Octomap was found.")
+ELSE (OCTOMAP_FOUND AND OCTOMAP_LIBRARY)
+	MESSAGE(FATAL_ERROR "Octomap not found!")
+	SET(OCTOMAP_DIR_MESSAGE "Octomap missing: needed for the SpaceTime map.")
+ENDIF(OCTOMAP_FOUND AND OCTOMAP_LIBRARY)
+
+ADD_SUBDIRECTORY(cpp)
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 
@@ -52,35 +70,35 @@ find_package(catkin REQUIRED COMPONENTS
 
 ## Generate messages in the 'msg' folder
 add_message_files(
-  FILES
-  Float32XY.msg
-  Float32XYZ.msg
-  Float32R.msg
-  Face.msg
-  Hand.msg
-  Saliency.msg
-  Utterance.msg
-  Sound.msg
-  Speech.msg
-  RealSenseParam.msg
-  FaceRequest.msg
-  FaceResponse.msg
-  CandidateFace.msg
-  CandidateHand.msg
-  CandidateSaliency.msg
-  CandidateSound.msg
-  CandidateSpeech.msg
-  EstablishedFace.msg
-  EstablishedHand.msg
-  EstablishedSaliency.msg
-)
+	FILES
+	Float32XY.msg
+	Float32XYZ.msg
+	Float32R.msg
+	Face.msg
+	Hand.msg
+	Saliency.msg
+	Utterance.msg
+	Sound.msg
+	Speech.msg
+	RealSenseParam.msg
+	FaceRequest.msg
+	FaceResponse.msg
+	CandidateFace.msg
+	CandidateHand.msg
+	CandidateSaliency.msg
+	CandidateSound.msg
+	CandidateSpeech.msg
+	EstablishedFace.msg
+	EstablishedHand.msg
+	EstablishedSaliency.msg
+	)
 
 ## Generate added messages and services with any dependencies listed here
 generate_messages(
-  DEPENDENCIES
-  std_msgs
-  sensor_msgs
-)
+	DEPENDENCIES
+	std_msgs
+	sensor_msgs
+	)
 
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##
@@ -98,9 +116,9 @@ generate_messages(
 
 ## Generate dynamic reconfigure parameters in the 'cfg' folder
 generate_dynamic_reconfigure_options(
-  cfg/vision_pipeline.cfg
-  cfg/hearing_pipeline.cfg
-)
+	cfg/vision_pipeline.cfg
+	cfg/hearing_pipeline.cfg
+	)
 
 catkin_package(CATKIN_DEPENDS message_runtime)
 
@@ -114,11 +132,11 @@ catkin_package(CATKIN_DEPENDS message_runtime)
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-#  INCLUDE_DIRS include
-#  LIBRARIES r2_perception
-#  CATKIN_DEPENDS other_catkin_pkg
-#  DEPENDS system_lib
-)
+	#  INCLUDE_DIRS include
+	#  LIBRARIES r2_perception
+	#  CATKIN_DEPENDS other_catkin_pkg
+	#  DEPENDS system_lib
+	)
 
 ###########
 ## Build ##
@@ -128,8 +146,8 @@ catkin_package(
 ## Your package locations should be listed before other locations
 # include_directories(include)
 include_directories(
-  ${catkin_INCLUDE_DIRS}
-)
+	${catkin_INCLUDE_DIRS}
+	)
 
 ## Declare a C++ library
 # add_library(${PROJECT_NAME}
