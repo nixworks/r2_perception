@@ -34,7 +34,7 @@ ELSE (OCTOMAP_FOUND AND OCTOMAP_LIBRARY)
 	SET(OCTOMAP_DIR_MESSAGE "Octomap missing: needed for the SpaceTime map.")
 ENDIF(OCTOMAP_FOUND AND OCTOMAP_LIBRARY)
 
-ADD_SUBDIRECTORY(cpp)
+# ADD_SUBDIRECTORY(cpp)
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 
