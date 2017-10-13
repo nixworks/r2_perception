@@ -102,9 +102,6 @@ class VisionPipeline(object):
         self.aspect = rospy.get_param("aspect")
         self.rotate = rospy.get_param("rotate")
 
-        self.pipeline_rate = rospy.get_param("pipeline_rate")
-        self.timer = rospy.Timer(rospy.Duration(1.0 / self.pipeline_rate),self.HandleTimer)
-
         self.face_regression_flag = rospy.get_param("face_regression_flag")
         self.hand_regression_flag = rospy.get_param("hand_regression_flag")
         self.saliency_regression_flag = rospy.get_param("saliency_regression_flag")
@@ -125,9 +122,6 @@ class VisionPipeline(object):
         self.full_hand_points = rospy.get_param("full_hand_points")
         self.full_saliency_points = rospy.get_param("full_saliency_points")
 
-        # start dynamic reconfigure server
-        self.config_server = Server(VisionConfig,self.HandleConfig)
-
         # start listening to transforms
         self.listener = tf.TransformListener()
 
@@ -139,9 +133,17 @@ class VisionPipeline(object):
         self.hand_sub = rospy.Subscriber("raw_hand",Hand,self.HandleHand)
         self.saliency_sub = rospy.Subscriber("raw_saliency",Saliency,self.HandleSaliency)
 
-        self.cface_pub = rospy.Publisher("cface",Candidateface,queue_size=5)
+        self.cface_pub = rospy.Publisher("cface",CandidateFace,queue_size=5)
         self.chand_pub = rospy.Publisher("chand",CandidateHand,queue_size=5)
         self.csaliency_pub = rospy.Publisher("csaliency",CandidateSaliency,queue_size=5)
+
+        self.pipeline_rate = rospy.get_param("pipeline_rate")
+
+        # start dynamic reconfigure server
+        self.config_server = Server(VisionConfig,self.HandleConfig)
+
+	# and start the timer
+        self.timer = rospy.Timer(rospy.Duration(1.0 / self.pipeline_rate),self.HandleTimer)
  
 
     def HandleConfig(self,data,level):
@@ -648,7 +650,7 @@ class VisionPipeline(object):
                         pst = self.listener.transformPoint("world",ps)
 
                         # setup candidate face message
-                        msg = Candidateface()
+                        msg = CandidateFace()
                         msg.session_id = self.session_id
                         msg.camera_id = self.camera_id
                         msg.cface_id = cface_id
