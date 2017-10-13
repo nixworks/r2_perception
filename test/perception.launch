@@ -49,53 +49,47 @@
 			<rosparam file="$(find r2_perception)/test/perception.yaml" command="load"/>
 
 			<!-- left eye camera -->
-			<group ns="lefteye">
+			<!--<group ns="lefteye">
 				<node name="camera" type="usb_cam_node" pkg="usb_cam">
 					<param name="video_device" value="/dev/video1"/>
 					<param name="pixel_format" value="yuyv"/>
-					<param name="width" value="320"/>
-					<param name="height" value="240"/>
+					<param name="image_width" value="320"/>
+					<param name="image_height" value="240"/>
 				</node>
-				<node name="detect_faces" type="detect_faces_haar.py" pkg="r2_perception"/>
-				<node name="detect_hands" type="detect_hands.py" pkg="r2_perception"/>
-				<node name="detect_saliency" type="detect_saliency_ittikoch.py" pkg="r2_perception"/>
+				<node name="detect" type="detect_faces_haar_hands_saliency_ittikoch.py" pkg="r2_perception"/>
 				<node name="face_analysis" type="face_analysis_openbr.py" pkg="r2_perception"/>
 				<node name="vision_pipeline" type="vision_pipeline.py" pkg="r2_perception"/>
-			</group>
+			</group>-->
 
 			<!-- right eye camera -->
 			<!--<group ns="righteye">
 				<node name="camera" type="usb_cam_node" pkg="usb_cam">
 					<param name="video_device" value="/dev/video2"/>
 					<param name="pixel_format" value="yuyv"/>
-					<param name="width" value="320"/>
-					<param name="height" value="240"/>
+					<param name="image_width" value="320"/>
+					<param name="image_height" value="240"/>
 				</node>
-				<node name="detect_faces" type="detect_faces_haar.py" pkg="r2_perception"/>
-				<node name="detect_hands" type="detect_hands.py" pkg="r2_perception"/>
-				<node name="detect_saliency" type="detect_saliency_ittikoch.py" pkg="r2_perception"/>
+				<node name="detect" type="detect_faces_haar_hands_saliency_ittikoch.py" pkg="r2_perception"/>
 				<node name="face_analysis" type="face_analysis.py" pkg="r2_perception"/>
 				<node name="vision_pipeline" type="vision_pipeline.py" pkg="r2_perception"/>
 			</group>-->
 
 			<!-- RealSense camera -->
-			<group ns="realsense">
+			<!--<group ns="realsense">
 				<node name="realsense_param_proxy" type="realsense_param_proxy.py" pkg="r2_perception"/>
 				<node name="face_analysis" type="face_analysis_openbr.py" pkg="r2_perception"/>
 				<node name="vision_pipeline" type="vision_pipeline.py" pkg="r2_perception"/>
-			</group>
+			</group>-->
 
 			<!-- wideangle camera -->
 			<group ns="wideangle">
 				<node name="camera" type="usb_cam_node" pkg="usb_cam">
 					<param name="video_device" value="/dev/video0"/>
 					<param name="pixel_format" value="yuyv"/>
-					<param name="width" value="640"/>
-					<param name="height" value="480"/>
+					<param name="image_width" value="320"/>
+					<param name="image_height" value="240"/>
 				</node>
-				<node name="detect_faces" type="detect_faces_haar.py" pkg="r2_perception"/>
-				<node name="detect_hands" type="detect_hands.py" pkg="r2_perception"/>
-				<node name="detect_saliency" type="detect_saliency_ittikoch.py" pkg="r2_perception"/>
+				<node name="detect" type="detect_faces_haar_hands_saliency_ittikoch.py" pkg="r2_perception"/>
 				<node name="face_analysis" type="face_analysis_openbr.py" pkg="r2_perception"/>
 				<node name="vision_pipeline" type="vision_pipeline.py" pkg="r2_perception"/>
 			</group>

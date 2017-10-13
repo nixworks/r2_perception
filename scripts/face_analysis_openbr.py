@@ -31,7 +31,7 @@ class FaceAnalysisOpenBiometrics(object):
         self.thumbs_ext = rospy.get_param("/thumbs_ext")
 
         # start dynamic reconfigure client from vision_pipeline
-        self.dynparam = dynamic_reconfigure.client.Client("vision_pipeline",timeout=30,config_callback=self.HandleConfig)
+        #self.dynparam = dynamic_reconfigure.client.Client("vision_pipeline",timeout=30,config_callback=self.HandleConfig)
 
         # start subscriber and publisher
         self.request_sub = rospy.Subscriber("face_request",FaceRequest,self.HandleFaceRequest)

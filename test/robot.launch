@@ -1,27 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <launch>
 
-	<arg name="name"/>
-	<arg name="session"/>
+    <arg name="name"/>
+    <arg name="session"/>
 
-	<!-- robot name -->
-	<param name="robot_name" type="str" value="$(arg name)"/>
+    <!-- robot name -->
+    <param name="robot_name" type="str" value="$(arg name)"/>
 
-	<!-- current session tag -->
-	<param name="session_tag" value="$(arg session)"/>
+    <!-- current session tag -->
+    <param name="session_tag" value="$(arg session)"/>
 
-	<!-- perception subsystem -->
-	<include file="perception.launch">
-        <arg name="name" value="$(arg name)"/>
-    </include>
-
-	<!-- AI subsystem -->
-	<include file="ai.launch">
-        <arg name="name" value="$(arg name)"/>
-    </include>
-
-	<!-- action subsystem -->
-	<include file="action.launch">
+    <!-- perception subsystem -->
+    <include file="perception.launch">
         <arg name="name" value="$(arg name)"/>
     </include>
 

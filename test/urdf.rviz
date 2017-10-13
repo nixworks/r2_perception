@@ -192,7 +192,7 @@ Visualization Manager:
       Value: true
     - Class: rviz/Marker
       Enabled: true
-      Marker Topic: /robot/perception/wideangle/rviz_face
+      Marker Topic: /sophia10/perception/wideangle/rviz_face
       Name: Marker
       Namespaces:
         {}
@@ -200,7 +200,7 @@ Visualization Manager:
       Value: true
     - Class: rviz/Marker
       Enabled: true
-      Marker Topic: /robot/perception/wideangle/rviz_hand
+      Marker Topic: /sophia10/perception/wideangle/rviz_hand
       Name: Marker
       Namespaces:
         {}
@@ -208,7 +208,7 @@ Visualization Manager:
       Value: true
     - Class: rviz/Marker
       Enabled: true
-      Marker Topic: /robot/perception/wideangle/rviz_saliency
+      Marker Topic: /sophia10/perception/wideangle/rviz_saliency
       Name: Marker
       Namespaces:
         {}
@@ -216,7 +216,7 @@ Visualization Manager:
       Value: true
     - Class: rviz/Marker
       Enabled: true
-      Marker Topic: /robot/perception/realsense/rviz_face
+      Marker Topic: /sophia10/perception/realsense/rviz_face
       Name: Marker
       Namespaces:
         {}
@@ -224,7 +224,7 @@ Visualization Manager:
       Value: true
     - Class: rviz/Marker
       Enabled: true
-      Marker Topic: /robot/perception/realsense/rviz_hand
+      Marker Topic: /sophia10/perception/realsense/rviz_hand
       Name: Marker
       Namespaces:
         {}
@@ -232,7 +232,7 @@ Visualization Manager:
       Value: true
     - Class: rviz/Marker
       Enabled: true
-      Marker Topic: /robot/perception/realsense/rviz_saliency
+      Marker Topic: /sophia10/perception/realsense/rviz_saliency
       Name: Marker
       Namespaces:
         {}
@@ -240,7 +240,7 @@ Visualization Manager:
       Value: true
     - Class: rviz/Marker
       Enabled: true
-      Marker Topic: /robot/perception/lefteye/rviz_face
+      Marker Topic: /sophia10/perception/lefteye/rviz_face
       Name: Marker
       Namespaces:
         {}
@@ -248,7 +248,7 @@ Visualization Manager:
       Value: true
     - Class: rviz/Marker
       Enabled: true
-      Marker Topic: /robot/perception/lefteye/rviz_hand
+      Marker Topic: /sophia10/perception/lefteye/rviz_hand
       Name: Marker
       Namespaces:
         {}
@@ -256,7 +256,7 @@ Visualization Manager:
       Value: true
     - Class: rviz/Marker
       Enabled: true
-      Marker Topic: /robot/perception/lefteye/rviz_saliency
+      Marker Topic: /sophia10/perception/lefteye/rviz_saliency
       Name: Marker
       Namespaces:
         {}
@@ -264,7 +264,7 @@ Visualization Manager:
       Value: true
     - Class: rviz/Marker
       Enabled: true
-      Marker Topic: /robot/perception/righteye/rviz_face
+      Marker Topic: /sophia10/perception/righteye/rviz_face
       Name: Marker
       Namespaces:
         {}
@@ -272,7 +272,7 @@ Visualization Manager:
       Value: true
     - Class: rviz/Marker
       Enabled: true
-      Marker Topic: /robot/perception/righteye/rviz_hand
+      Marker Topic: /sophia10/perception/righteye/rviz_hand
       Name: Marker
       Namespaces:
         {}
@@ -280,7 +280,7 @@ Visualization Manager:
       Value: true
     - Class: rviz/Marker
       Enabled: true
-      Marker Topic: /robot/perception/righteye/rviz_saliency
+      Marker Topic: /sophia10/perception/righteye/rviz_saliency
       Name: Marker
       Namespaces:
         {}

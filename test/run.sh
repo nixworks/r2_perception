@@ -2,7 +2,7 @@
 
 set -e
 
-SCRIPTDIR=~/hansonrobotics/private_ws/src/r2_perception/test
+SCRIPTDIR=~/hansonrobotics/HEAD/src/r2_perception/test
 
 export NAME=robot
 export SESSION=$(date +%H%M%S)
@@ -12,7 +12,7 @@ export OC_LOG_LEVEL=info        # error, warn, info, debug and fine
 export OGRE_RTT_MODE=Copy # to maybe help against rviz crashes...
 export LIBGL_ALWAYS_SOFTWARE=1
 
-source ~/hansonrobotics/private_ws/devel/setup.bash
+source ~/hansonrobotics/HEAD/devel/setup.bash
 
 # kill already running session
 if [[ $(tmux ls 2>/dev/null) == ${NAME}* ]]; then
@@ -31,6 +31,6 @@ until rostopic list >/dev/null 2>&1; do sleep 1; done
 tmux new-window -n 'blender' "cd ~/hansonrobotics/sophia_blender_api && ./run.sh Sophia6.blend; $SHELL"
 
 # start bash shell
-tmux new-window -n 'bash' "cd $SCRIPTDIR; source ~/hansonrobotics/private_ws/devel/setup.bash; $SHELL"
+tmux new-window -n 'bash' "cd $SCRIPTDIR; source ~/hansonrobotics/HEAD/devel/setup.bash; $SHELL"
 
 tmux attach;

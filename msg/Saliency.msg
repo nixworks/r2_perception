@@ -1,5 +1,6 @@
 uint32 saliency_id
 time ts
+Float32XY screen
 Float32XYZ direction
 float32 motion
 float32 umap

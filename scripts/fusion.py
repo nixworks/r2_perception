@@ -112,7 +112,7 @@ class Fusion(object):
             facegroups = []
 
             # iterate over all pipeline pairs without duplications
-            for camera_id1 in self.faces:
+            for camera_id1 in self.cfaces:
                 for camera_id2 in self.cfaces:
                     if camera_id1 < camera_id2:  # the IDs are numeric hashes based on the unique pipeline name
 

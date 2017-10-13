@@ -41,8 +41,11 @@ class SaliencyPredictor(object):
             t = (ts - saliency.ts).to_sec()
 
             # saliency
-            sums.position.x += saliency.position.x
-            sums.position.y += saliency.position.y
+            sums.direction.x += saliency.direction.x
+            sums.direction.y += saliency.direction.y
+            sums.direction.z += saliency.direction.z
+            sums.screen.x += saliency.screen.x
+            sums.screen.y += saliency.screen.y
             sums.confidence += saliency.confidence
 
             # time
@@ -52,8 +55,11 @@ class SaliencyPredictor(object):
             sumtt += t * t
 
             # saliency * time
-            sumst.position.x += saliency.position.x * t
-            sumst.position.y += saliency.position.y * t
+            sumst.direction.x += saliency.direction.x * t
+            sumst.direction.y += saliency.direction.y * t
+            sumst.direction.z += saliency.direction.z * t
+            sumst.screen.x += saliency.screen.x * t
+            sumst.screen.y += saliency.screen.y * t
             sumst.confidence += saliency.confidence * t
 
         # saliency slope
@@ -62,16 +68,22 @@ class SaliencyPredictor(object):
         if den == 0.0:
             return self.saliencies[0]
 
-        slps.position.x = (n * sumst.position.x - sumt * sums.position.x) / den
-        slps.position.y = (n * sumst.position.y - sumt * sums.position.y) / den
+        slps.direction.x = (n * sumst.direction.x - sumt * sums.direction.x) / den
+        slps.direction.y = (n * sumst.direction.y - sumt * sums.direction.y) / den
+        slps.direction.z = (n * sumst.direction.z - sumt * sums.direction.z) / den
+        slps.screen.x = (n * sumst.screen.x - sumt * sums.screen.x) / den
+        slps.screen.y = (n * sumst.screen.y - sumt * sums.screen.y) / den
         slps.confidence = (n * sumst.confidence - sumt * sums.confidence) / den
 
         # result
         result = Saliency()
         result.ts = ts
         result.saliency_id = 0
-        result.position.x = (sums.position.x - slps.position.x * sumt) / float(n)
-        result.position.y = (sums.position.y - slps.position.y * sumt) / float(n)
+        result.direction.x = (sums.direction.x - slps.direction.x * sumt) / float(n)
+        result.direction.y = (sums.direction.y - slps.direction.y * sumt) / float(n)
+        result.direction.z = (sums.direction.z - slps.direction.z * sumt) / float(n)
+        result.screen.x = (sums.screen.x - slps.screen.x * sumt) / float(n)
+        result.screen.y = (sums.screen.y - slps.screen.y * sumt) / float(n)
         result.confidence = (sums.confidence - slps.confidence * sumt) / float(n)
 
         return result
